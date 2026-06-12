@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Calendar, MapPin, Tag, Clock, Utensils, Compass, ShoppingBag, Shield } from 'lucide-react';
+import { X, Calendar, MapPin, Clock, Compass, ShoppingBag } from 'lucide-react';
 import { Visitor, JourneyItem, JourneyStats } from '@/types';
 import { getVisitorJourney } from '@/lib/services/visitorService';
 import { formatRupiah } from '@/lib/utils';
@@ -32,14 +32,7 @@ export const VisitorJourneyDrawer: React.FC<VisitorJourneyDrawerProps> = ({
     }
   }, [isOpen, visitor]);
 
-  // Load journey data when date or visitor changes
-  useEffect(() => {
-    if (isOpen && visitor && selectedDate) {
-      loadJourneyData();
-    }
-  }, [isOpen, visitor, selectedDate]);
-
-  const loadJourneyData = async () => {
+  const loadJourneyData = useCallback(async () => {
     if (!visitor) return;
     setLoading(true);
     try {
@@ -50,12 +43,19 @@ export const VisitorJourneyDrawer: React.FC<VisitorJourneyDrawerProps> = ({
         setJourney(res.journey || []);
         setStats(res.stats || null);
       }
-    } catch (err) {
+    } catch {
       toast.error('Gagal mengambil data journey');
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate, visitor]);
+
+  // Load journey data when date or visitor changes
+  useEffect(() => {
+    if (isOpen && visitor && selectedDate) {
+      void loadJourneyData();
+    }
+  }, [isOpen, visitor, selectedDate, loadJourneyData]);
 
   // Category Color mapping for Timeline Dots
   const getCategoryColor = (category: string) => {

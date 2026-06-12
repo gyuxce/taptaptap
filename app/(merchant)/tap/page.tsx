@@ -2,23 +2,22 @@
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   SmartphoneNfc, Scan, History, Settings, FilePlus2, 
   LogOut, Activity, AlertTriangle, Zap, CheckCircle2, 
-  XCircle, ChevronRight, RefreshCw, Download, Store, Info,
-  PlusCircle
+  XCircle, RefreshCw, Download, Store
 } from 'lucide-react';
 
 import { useAuth } from '@/lib/auth';
-import { isSupabaseConfigured } from '@/lib/supabase';
 import { registerVisitorSchema, RegisterVisitorInput } from '@/lib/validations';
-import { fetchVisitorByUID, registerVisitor, checkCredit, deductCredit, topUpCredit } from '@/lib/services/visitorService';
-import { logTransaction, fetchTransactions, fetchTransactionStats } from '@/lib/services/transactionService';
+import { fetchVisitorByUID, registerVisitor, checkCredit, topUpCredit } from '@/lib/services/visitorService';
+import { logTransaction } from '@/lib/services/transactionService';
 import { getMerchantByUserId } from '@/lib/services/merchantService';
-import { Visitor, Merchant, Transaction, RFIDTag } from '@/types';
+import { Visitor, Merchant, RFIDTag } from '@/types';
 import { formatRupiah, formatDatetime, normalizeUID } from '@/lib/utils';
 
 import { Button } from '@/components/ui/Button';
@@ -30,8 +29,12 @@ import { Toaster, toast } from '@/components/ui/Toast';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StatCard } from '@/components/ui/StatCard';
 import { Modal } from '@/components/ui/Modal';
+import { useMerchantHistory } from '@/components/merchant/useMerchantHistory';
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+const RevenueChart = dynamic(() => import('@/components/merchant/RevenueChart'), {
+  ssr: false,
+  loading: () => <div className="h-full w-full rounded-xl bg-slate-100 animate-pulse" />,
+});
 
 export default function MerchantTerminalPage() {
   const router = useRouter();
@@ -41,7 +44,6 @@ export default function MerchantTerminalPage() {
   const [merchant, setMerchant] = useState<Merchant | null>(null);
   const [terminalLoading, setTerminalLoading] = useState(true);
   const [activeDrawer, setActiveDrawer] = useState<'visitor' | 'error_unregistered' | 'double_tap' | 'credit_error' | 'register' | 'topup' | 'settings' | 'history' | null>(null);
-  const simulationMode = false;
 
   // NFC Abort Controllers Refs
   const mainAbortControllerRef = useRef<AbortController | null>(null);
@@ -53,12 +55,12 @@ export default function MerchantTerminalPage() {
   // Scanning State
   const [isScanning, setIsScanning] = useState(false);
   const [nfcError, setNfcError] = useState<string | null>(null);
-  const [httpsWarning, setHttpsWarning] = useState(false);
   const [tapScenarioLoading, setTapScenarioLoading] = useState(false);
 
   // Double Tap Prevention Ref
   const lastScansRef = useRef<{ [uid: string]: number }>({});
   const isSubmittingRef = useRef(false);
+  const idempotencyKeyRef = useRef<{ uid: string; key: string } | null>(null);
 
   // Drawers and Overlays state
   const [scannedUID, setScannedUID] = useState<string>('');
@@ -83,7 +85,7 @@ export default function MerchantTerminalPage() {
   } | null>(null);
 
   // Top Up Tab States
-  const [topUpScannedUID, setTopUpScannedUID] = useState('');
+  const [, setTopUpScannedUID] = useState('');
   const [topUpVisitor, setTopUpVisitor] = useState<Visitor | null>(null);
   const [topUpTag, setTopUpTag] = useState<RFIDTag | null>(null);
   const [topUpAmount, setTopUpAmount] = useState('');
@@ -94,32 +96,42 @@ export default function MerchantTerminalPage() {
   const [topUpSuccessVisitorName, setTopUpSuccessVisitorName] = useState('');
   const [topUpScanLoading, setTopUpScanLoading] = useState(false);
   const [isTopUpScanning, setIsTopUpScanning] = useState(false);
-  const [topUpNfcError, setTopUpNfcError] = useState<string | null>(null);
+  const [, setTopUpNfcError] = useState<string | null>(null);
 
   // Registration Tab States
   const [registerStep, setRegisterStep] = useState<1 | 2>(1);
   const [newTagUID, setNewTagUID] = useState('');
-  const [newTagError, setNewTagError] = useState<string | null>(null);
 
-  // History Tab States
-  const [historyFilter, setHistoryFilter] = useState<'hari' | 'minggu' | 'bulan' | 'custom'>('hari');
-  const [customDateFrom, setCustomDateFrom] = useState('');
-  const [customDateTo, setCustomDateTo] = useState('');
-  const [historyTxs, setHistoryTxs] = useState<Transaction[]>([]);
-  const [historyTotalCount, setHistoryTotalCount] = useState(0);
-  const [historyStats, setHistoryStats] = useState({
-    today: { count: 0, total: 0 },
-    thisWeek: { count: 0, total: 0 },
-    thisMonth: { count: 0, total: 0 },
-  });
-  const [historyOffset, setHistoryOffset] = useState(0);
-  const [historyFetchLoading, setHistoryFetchLoading] = useState(false);
-  const [historyRefreshing, setHistoryRefreshing] = useState(false);
+  const {
+    filter: historyFilter,
+    setFilter: setHistoryFilter,
+    customDateFrom,
+    setCustomDateFrom,
+    customDateTo,
+    setCustomDateTo,
+    transactions: historyTxs,
+    totalCount: historyTotalCount,
+    stats: historyStats,
+    loading: historyFetchLoading,
+    refreshing: historyRefreshing,
+    refresh: loadHistoryData,
+    loadMore: loadMoreHistory,
+  } = useMerchantHistory(merchant?.id, activeDrawer === 'history');
 
   // Dialog Confirmations
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+  useEffect(() => {
+    if (!showSuccessFlash) return;
+    const timeoutId = window.setTimeout(() => setShowSuccessFlash(false), 1800);
+    return () => window.clearTimeout(timeoutId);
+  }, [showSuccessFlash]);
 
+  useEffect(() => {
+    if (!topUpSuccessFlash) return;
+    const timeoutId = window.setTimeout(() => setTopUpSuccessFlash(false), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [topUpSuccessFlash]);
 
   // 1. Auth check
   useEffect(() => {
@@ -134,7 +146,7 @@ export default function MerchantTerminalPage() {
       }
       loadMerchantAndConfig(profile.id);
     }
-  }, [user, profile, authLoading]);
+  }, [user, profile, authLoading, router]);
 
   // 2. Load nominal defaults from localstorage
   useEffect(() => {
@@ -157,7 +169,7 @@ export default function MerchantTerminalPage() {
     if (mainAbortControllerRef.current) {
       try {
         mainAbortControllerRef.current.abort();
-      } catch (e) {
+      } catch {
         // ignore abort error
       }
       mainAbortControllerRef.current = null;
@@ -165,7 +177,7 @@ export default function MerchantTerminalPage() {
     if (topUpAbortControllerRef.current) {
       try {
         topUpAbortControllerRef.current.abort();
-      } catch (e) {
+      } catch {
         // ignore abort error
       }
       topUpAbortControllerRef.current = null;
@@ -178,12 +190,12 @@ export default function MerchantTerminalPage() {
       if (mainAbortControllerRef.current) {
         try {
           mainAbortControllerRef.current.abort();
-        } catch (e) {}
+        } catch {}
       }
       if (topUpAbortControllerRef.current) {
         try {
           topUpAbortControllerRef.current.abort();
-        } catch (e) {}
+        } catch {}
       }
     };
   }, []);
@@ -196,124 +208,10 @@ export default function MerchantTerminalPage() {
       
 
 
-      // Check protocol warnings
-      if (typeof window !== 'undefined') {
-        const isNotLocal = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-        const isNotHttps = window.location.protocol !== 'https:';
-        if (isNotLocal && isNotHttps) {
-          setHttpsWarning(true);
-        }
-      }
-    } catch (err) {
+    } catch {
       toast.error('Gagal memuat profil merchant');
     } finally {
       setTerminalLoading(false);
-    }
-  };
-
-  // Auto load today's stats on merchant load
-  useEffect(() => {
-    if (merchant) {
-      loadHistoryData(true);
-    }
-  }, [merchant]);
-
-  // 3. Auto reload stats & transactions every 30s in History Drawer
-  useEffect(() => {
-    if (activeDrawer === 'history' && merchant) {
-      loadHistoryData(false);
-      const timer = setInterval(() => {
-        loadHistoryData(true);
-      }, 30000);
-      return () => clearInterval(timer);
-    }
-  }, [activeDrawer, merchant, historyFilter, customDateFrom, customDateTo]);
-
-  const loadHistoryData = async (isSilent = false) => {
-    if (!merchant) return;
-    if (!isSilent) setHistoryFetchLoading(true);
-    else setHistoryRefreshing(true);
-
-    try {
-      // Load stats
-      const stats = await fetchTransactionStats(merchant.id);
-      setHistoryStats(stats);
-
-      // Load paginated list (offset = 0)
-      const dateRange: { dateFrom?: string; dateTo?: string } = {};
-      const now = new Date();
-      if (historyFilter === 'hari') {
-        dateRange.dateFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      } else if (historyFilter === 'minggu') {
-        const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1));
-        startOfWeek.setHours(0,0,0,0);
-        dateRange.dateFrom = startOfWeek.toISOString();
-      } else if (historyFilter === 'bulan') {
-        dateRange.dateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      } else if (historyFilter === 'custom') {
-        if (customDateFrom) dateRange.dateFrom = new Date(customDateFrom).toISOString();
-        if (customDateTo) {
-          const toDate = new Date(customDateTo);
-          toDate.setHours(23, 59, 59, 999);
-          dateRange.dateTo = toDate.toISOString();
-        }
-      }
-
-      const listRes = await fetchTransactions(merchant.id, {
-        ...dateRange,
-        limit: 50,
-        offset: 0,
-      });
-
-      setHistoryTxs(listRes.transactions);
-      setHistoryTotalCount(listRes.total);
-      setHistoryOffset(0);
-    } catch (err) {
-      console.error(err);
-      toast.error('Gagal mengambil riwayat transaksi');
-    } finally {
-      setHistoryFetchLoading(false);
-      setHistoryRefreshing(false);
-    }
-  };
-
-  const loadMoreHistory = async () => {
-    if (!merchant || historyFetchLoading) return;
-    setHistoryFetchLoading(true);
-
-    try {
-      const dateRange: { dateFrom?: string; dateTo?: string } = {};
-      const now = new Date();
-      if (historyFilter === 'hari') {
-        dateRange.dateFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      } else if (historyFilter === 'minggu') {
-        const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1));
-        startOfWeek.setHours(0,0,0,0);
-        dateRange.dateFrom = startOfWeek.toISOString();
-      } else if (historyFilter === 'bulan') {
-        dateRange.dateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      } else if (historyFilter === 'custom') {
-        if (customDateFrom) dateRange.dateFrom = new Date(customDateFrom).toISOString();
-        if (customDateTo) {
-          const toDate = new Date(customDateTo);
-          toDate.setHours(23, 59, 59, 999);
-          dateRange.dateTo = toDate.toISOString();
-        }
-      }
-
-      const nextOffset = historyOffset + 50;
-      const listRes = await fetchTransactions(merchant.id, {
-        ...dateRange,
-        limit: 50,
-        offset: nextOffset,
-      });
-
-      setHistoryTxs(prev => [...prev, ...listRes.transactions]);
-      setHistoryOffset(nextOffset);
-    } catch (err) {
-      toast.error('Gagal memuat transaksi berikutnya');
-    } finally {
-      setHistoryFetchLoading(false);
     }
   };
 
@@ -355,7 +253,7 @@ export default function MerchantTerminalPage() {
         setPaymentAmount(defaultNominal.toString());
         setActiveDrawer('visitor');
       }
-    } catch (err) {
+    } catch {
       toast.error('Koneksi terganggu.');
     } finally {
       setTapScenarioLoading(false);
@@ -373,7 +271,7 @@ export default function MerchantTerminalPage() {
       if (mainAbortControllerRef.current) {
         try {
           mainAbortControllerRef.current.abort();
-        } catch (e) {}
+        } catch {}
         mainAbortControllerRef.current = null;
       }
       setIsScanning(false);
@@ -386,23 +284,23 @@ export default function MerchantTerminalPage() {
       if (mainAbortControllerRef.current) {
         try {
           mainAbortControllerRef.current.abort();
-        } catch (e) {}
+        } catch {}
       }
       const controller = new AbortController();
       mainAbortControllerRef.current = controller;
 
-      const ndef = new (window as any).NDEFReader();
+      const ndef = new NDEFReader();
       await ndef.scan({ signal: controller.signal });
-      ndef.onreading = (event: any) => {
+      ndef.onreading = (event: NDEFReadingEvent) => {
         const normalized = normalizeUID(event.serialNumber);
         processScannedRFID(normalized);
       };
       ndef.onreadingerror = () => {
         toast.error('Gagal membaca tag NFC. Silakan coba lagi.');
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setNfcError('Gagal mendeteksi sensor: ' + (err.message || err));
+      setNfcError('Gagal mendeteksi sensor: ' + (err instanceof Error ? err.message : String(err)));
       setIsScanning(false);
       mainAbortControllerRef.current = null;
     }
@@ -435,7 +333,7 @@ export default function MerchantTerminalPage() {
         setTopUpAmount('');
         setTopUpNote('');
       }
-    } catch (err) {
+    } catch {
       toast.error('Koneksi terganggu.');
       setTopUpScannedUID('');
     } finally {
@@ -454,7 +352,7 @@ export default function MerchantTerminalPage() {
       if (topUpAbortControllerRef.current) {
         try {
           topUpAbortControllerRef.current.abort();
-        } catch (e) {}
+        } catch {}
         topUpAbortControllerRef.current = null;
       }
       setIsTopUpScanning(false);
@@ -467,23 +365,23 @@ export default function MerchantTerminalPage() {
       if (topUpAbortControllerRef.current) {
         try {
           topUpAbortControllerRef.current.abort();
-        } catch (e) {}
+        } catch {}
       }
       const controller = new AbortController();
       topUpAbortControllerRef.current = controller;
 
-      const ndef = new (window as any).NDEFReader();
+      const ndef = new NDEFReader();
       await ndef.scan({ signal: controller.signal });
-      ndef.onreading = (event: any) => {
+      ndef.onreading = (event: NDEFReadingEvent) => {
         const normalized = normalizeUID(event.serialNumber);
         processTopUpRFID(normalized);
       };
       ndef.onreadingerror = () => {
         toast.error('Gagal membaca tag NFC. Silakan coba lagi.');
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setTopUpNfcError('Gagal mendeteksi sensor: ' + (err.message || err));
+      setTopUpNfcError('Gagal mendeteksi sensor: ' + (err instanceof Error ? err.message : String(err)));
       setIsTopUpScanning(false);
       topUpAbortControllerRef.current = null;
     }
@@ -492,6 +390,10 @@ export default function MerchantTerminalPage() {
   const handleConfirmTopUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topUpVisitor || !topUpTag || !merchant) return;
+    if (!navigator.onLine) {
+      toast.error('Top up memerlukan koneksi internet');
+      return;
+    }
 
     const cleanAmount = parseInt(topUpAmount.replace(/\./g, ''), 10) || 0;
     if (cleanAmount <= 0) {
@@ -521,7 +423,7 @@ export default function MerchantTerminalPage() {
       } else {
         toast.error(res.error || 'Top Up gagal');
       }
-    } catch (err) {
+    } catch {
       toast.error('Terjadi kesalahan, coba lagi');
     } finally {
       setTopUpLoading(false);
@@ -531,6 +433,10 @@ export default function MerchantTerminalPage() {
   // 6. Confirm Tap Payment (Deduct credit and Log transaction)
   const handleConfirmTap = useCallback(async (bypassDoubleTap = false) => {
     if (!merchant || !scannedUID || isSubmittingRef.current) return;
+    if (!navigator.onLine) {
+      toast.error('Transaksi memerlukan koneksi internet');
+      return;
+    }
     isSubmittingRef.current = true;
     setConfirmTapLoading(true);
 
@@ -562,23 +468,29 @@ export default function MerchantTerminalPage() {
         lastScansRef.current[scannedUID] = Date.now();
       }
 
-      // C. Log transaction
+      // C. Process the balance update and ledger insert in one database transaction.
+      if (!idempotencyKeyRef.current || idempotencyKeyRef.current.uid !== scannedUID) {
+        idempotencyKeyRef.current = { uid: scannedUID, key: crypto.randomUUID() };
+      }
       const logRes = await logTransaction({
         rfid_uid: scannedUID,
         merchant_id: merchant.id,
         type: merchant.merchant_type === 'loket' ? 'entry' : 'payment',
         amount: chargeAmount,
+        idempotency_key: idempotencyKeyRef.current.key,
+        allow_rapid_repeat: bypassDoubleTap,
       });
 
       if ('error' in logRes) {
-        toast.error(logRes.error);
-      } else {
-        // D. Deduct Credit locally/Supabase if regular payment
-        if (chargeAmount > 0 && selectedVisitor) {
-          await deductCredit(selectedVisitor.id, chargeAmount);
+        if (logRes.error === 'DOUBLE_TAP') {
+          setDoubleTapInfo({ uid: scannedUID, lastTime: new Date().toLocaleTimeString('id-ID') });
+          setActiveDrawer('double_tap');
+        } else {
+          toast.error(logRes.error);
         }
-
-        // E. Success Overlay
+      } else {
+        idempotencyKeyRef.current = null;
+        // D. Success Overlay
         setSuccessVisitorName(selectedVisitor?.name || 'Wisatawan');
         setActiveDrawer(null);
         setShowSuccessFlash(true);
@@ -595,13 +507,13 @@ export default function MerchantTerminalPage() {
         // Reload data
         loadHistoryData(true);
       }
-    } catch (err) {
+    } catch {
       toast.error('Pencatatan gagal');
     } finally {
       setConfirmTapLoading(false);
       isSubmittingRef.current = false;
     }
-  }, [merchant, scannedUID, paymentAmount, selectedVisitor]);
+  }, [loadHistoryData, merchant, scannedUID, paymentAmount, selectedVisitor]);
 
 
   // 7. (Simulator removed — real NFC only)
@@ -643,7 +555,7 @@ export default function MerchantTerminalPage() {
         // Refresh local paired lists
         loadMerchantAndConfig(profile?.id || '');
       }
-    } catch (err) {
+    } catch {
       toast.error('Registrasi gagal');
     } finally {
       setConfirmTapLoading(false);
@@ -719,10 +631,6 @@ export default function MerchantTerminalPage() {
       };
     });
   }, [historyTxs]);
-
-  const hasNoChartRevenue = useMemo(() => {
-    return chartData.every(item => item.revenue === 0);
-  }, [chartData]);
 
   if (authLoading || terminalLoading) {
     return (
@@ -809,8 +717,6 @@ export default function MerchantTerminalPage() {
               >
                 Selesai
               </Button>
-              {/* Auto dismiss timer */}
-              {setTimeout(() => setShowSuccessFlash(false), 1800) && null}
             </motion.div>
           )}
         </AnimatePresence>
@@ -848,8 +754,6 @@ export default function MerchantTerminalPage() {
               >
                 Selesai
               </Button>
-              {/* Auto dismiss timer */}
-              {setTimeout(() => setTopUpSuccessFlash(false), 2000) && null}
             </motion.div>
           )}
         </AnimatePresence>
@@ -1860,20 +1764,7 @@ export default function MerchantTerminalPage() {
                   Tren Belanja Souvenir (Harian)
                 </span>
                 <div className="h-44 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ left: -25, right: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e3db" />
-                      <XAxis dataKey="date" fontSize={9} stroke="#64748b" />
-                      <YAxis 
-                        fontSize={9} 
-                        stroke="#64748b" 
-                        domain={hasNoChartRevenue ? [0, 10000] : [0, 'auto']} 
-                        tickFormatter={(v) => v === 0 ? 'Rp0' : v % 1000 === 0 ? `Rp${v/1000}k` : `Rp${(v/1000).toFixed(1)}k`} 
-                      />
-                      <Tooltip formatter={(v) => formatRupiah(Number(v))} contentStyle={{ fontSize: 10, borderRadius: 8 }} />
-                      <Bar dataKey="revenue" fill="#29ABE2" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <RevenueChart data={chartData} />
                 </div>
               </div>
             )}

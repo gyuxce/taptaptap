@@ -1,25 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { isSupabaseAdminConfigured, supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getVerifiedAdmin } from '@/lib/serverAuth';
+import { consumeRateLimit } from '@/lib/serverRateLimit';
+import { logger, requestId } from '@/lib/logger';
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const correlationId = requestId(req.headers);
   try {
-    // 1. Auth Guard (check admin session in cookies)
-    const cookieHeader = req.headers.get('cookie') || '';
-    const sessionCookie = cookieHeader
-      .split('; ')
-      .find(row => row.startsWith('ecotour_session='))
-      ?.split('=')[1];
-    
-    let adminProfile: any = null;
-    if (sessionCookie) {
-      try {
-        adminProfile = JSON.parse(decodeURIComponent(sessionCookie));
-      } catch {
-        // ignore
-      }
-    }
-
-    if (!adminProfile || adminProfile.role !== 'admin') {
+    const adminProfile = await getVerifiedAdmin(req);
+    if (!adminProfile) {
       return NextResponse.json({ error: 'Unauthorized. Akses ditolak.' }, { status: 401 });
     }
 
@@ -28,6 +17,25 @@ export async function POST(req: Request) {
     const { id } = body;
     if (!id) {
       return NextResponse.json({ error: 'ID Merchant diperlukan' }, { status: 400 });
+    }
+
+    if (!isSupabaseAdminConfigured) {
+      return NextResponse.json(
+        { error: 'SUPABASE_SERVICE_ROLE_KEY belum dikonfigurasi' },
+        { status: 503 }
+      );
+    }
+    const rateLimit = await consumeRateLimit(req, {
+      namespace: 'admin:delete-merchant',
+      subject: adminProfile.id,
+      limit: 5,
+      windowSeconds: 60,
+    });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: rateLimit.unavailable ? 'Rate limiter tidak tersedia' : 'Terlalu banyak permintaan' },
+        { status: rateLimit.unavailable ? 503 : 429 }
+      );
     }
 
     if (isSupabaseAdminConfigured) {
@@ -76,11 +84,10 @@ export async function POST(req: Request) {
       }
 
       return NextResponse.json({ success: true });
-    } else {
-      return NextResponse.json({ success: true, skipped: true, reason: 'offline_mode_simulation' });
     }
-  } catch (err: any) {
-    console.error('[delete-merchant] caught error:', err);
-    return NextResponse.json({ error: 'Internal Server Error: ' + err.message }, { status: 500 });
+  } catch (err: unknown) {
+    logger.error('merchant.delete.failed', { correlationId, error: err });
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: 'Internal Server Error: ' + message }, { status: 500 });
   }
 }

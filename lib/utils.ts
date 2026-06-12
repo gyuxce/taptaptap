@@ -67,7 +67,7 @@ export function getInitials(name: string): string {
 
 export function normalizeUID(uid: string): string {
   if (!uid) return '';
-  return uid.replace(/[\s-]/g, '').toUpperCase();
+  return uid.replace(/[^0-9a-f]/gi, '').toUpperCase();
 }
 
 export function getTicketColor(type: string): string {

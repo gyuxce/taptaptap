@@ -1,365 +1,163 @@
 import { createBrowserClient } from '@supabase/ssr';
-import { Visitor, Merchant, Transaction, RFIDTag, Profile, CreditCheckResult } from '@/types';
+import type { CreditCheckResult, Merchant, RFIDTag, Transaction, Visitor } from '@/types';
 import { normalizeUID } from './utils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
+export const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
 
-// Pass placeholders if not configured to prevent crash during createBrowserClient
-export const supabase = createBrowserClient(
-  supabaseUrl || 'https://placeholder-project.supabase.co',
-  supabaseAnonKey || 'placeholder-anon-key'
-);
-
-// Helper to generate a mock RFID UID
-function generateRFIDUID(): string {
-  const chars = '0123456789ABCDEF';
-  let uid = '';
-  for (let i = 0; i < 16; i++) {
-    uid += chars[Math.floor(Math.random() * 16)];
+export function requireSupabaseConfig() {
+  if (!hasSupabaseConfig) {
+    throw new Error(
+      'Konfigurasi Supabase belum tersedia. Isi NEXT_PUBLIC_SUPABASE_URL dan NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+    );
   }
-  return uid;
 }
 
-const MOCK_MERCHANTS: Merchant[] = [];
-const MOCK_VISITORS: Visitor[] = [];
-const MOCK_RFID_TAGS: RFIDTag[] = [];
-const MOCK_TRANSACTIONS: Transaction[] = [];
-
-// Storage Helpers
-export const getStorageItem = <T>(key: string, defaultValue: T): T => {
-  if (typeof window === 'undefined') return defaultValue;
-  const stored = window.localStorage.getItem(key);
-  if (!stored) {
-    window.localStorage.setItem(key, JSON.stringify(defaultValue));
-    return defaultValue;
-  }
-  return JSON.parse(stored) as T;
-};
-
-export const setStorageItem = <T>(key: string, value: T): void => {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(key, JSON.stringify(value));
-};
+export const supabase = createBrowserClient(
+  supabaseUrl || 'https://missing-config.supabase.co',
+  supabaseAnonKey || 'missing-config'
+);
 
 export const db = {
-  getSession: (): Profile | null => {
-    if (typeof window !== 'undefined') {
-      const stored = window.sessionStorage.getItem('ecotour_session') || window.localStorage.getItem('ecotour_session');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const sessionObj = parsed.profile || parsed;
-        if (sessionObj && !document.cookie.includes('ecotour_session')) {
-          document.cookie = `ecotour_session=${encodeURIComponent(JSON.stringify(sessionObj))}; path=/; max-age=86400`;
-        }
-        return sessionObj;
-      }
-    }
-    return null;
-  },
-
-  // Visitors & RFID
   getVisitors: async (): Promise<Visitor[]> => {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('visitors')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) {
-        console.error('[db.getVisitors] error:', error);
-        return [];
-      }
-      return data as Visitor[];
-    }
-    return getStorageItem<Visitor[]>('ecotour_visitors', MOCK_VISITORS);
+    requireSupabaseConfig();
+    const { data, error } = await supabase
+      .from('visitors')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data as Visitor[];
   },
 
   getRFIDTags: async (): Promise<RFIDTag[]> => {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('rfid_tags')
-        .select('*')
-        .order('registered_at', { ascending: false });
-      if (error) {
-        console.error('[db.getRFIDTags] error:', error);
-        return [];
-      }
-      return data as RFIDTag[];
-    }
-    return getStorageItem<RFIDTag[]>('ecotour_rfid_tags', MOCK_RFID_TAGS);
+    requireSupabaseConfig();
+    const { data, error } = await supabase
+      .from('rfid_tags')
+      .select('*')
+      .order('registered_at', { ascending: false });
+    if (error) throw error;
+    return data as RFIDTag[];
   },
 
   getVisitorByUID: async (uid: string): Promise<{ visitor: Visitor; tag: RFIDTag } | null> => {
-    const normalized = normalizeUID(uid);
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('rfid_tags')
-        .select('*, visitor:visitors(*)')
-        .eq('uid', normalized)
-        .eq('is_active', true)
-        .maybeSingle();
+    requireSupabaseConfig();
+    const { data, error } = await supabase
+      .from('rfid_tags')
+      .select('*, visitor:visitors(*)')
+      .eq('uid', normalizeUID(uid))
+      .eq('is_active', true)
+      .maybeSingle();
 
-      if (error || !data || !data.visitor) {
-        return null;
-      }
-      const { visitor, ...tagOnly } = data;
-      return { visitor: visitor as Visitor, tag: tagOnly as RFIDTag };
-    }
-    const tags = await db.getRFIDTags();
-    const visitors = await db.getVisitors();
-    
-    const tag = tags.find(t => t.uid === normalized && t.is_active);
-    if (!tag) return null;
-    
-    const visitor = visitors.find(v => v.id === tag.visitor_id);
-    if (!visitor) return null;
-    
-    return { visitor, tag };
+    if (error) throw error;
+    if (!data?.visitor) return null;
+    const { visitor, ...tag } = data;
+    return { visitor: visitor as Visitor, tag: tag as RFIDTag };
   },
 
-  createVisitor: async (data: Omit<Visitor, 'id' | 'created_at' | 'credit_used' | 'photo_url'>, uid: string): Promise<Visitor> => {
-    const normalized = normalizeUID(uid);
-    const photoUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(data.name)}`;
-    if (isSupabaseConfigured) {
-      // 1. Insert visitor
-      const { data: newVisitor, error: vErr } = await supabase
-        .from('visitors')
-        .insert({
-          name: data.name,
-          phone: data.phone || null,
-          photo_url: photoUrl,
-          ticket_type: data.ticket_type,
-          credit_limit: data.credit_limit,
-          credit_used: 0
-        })
-        .select()
-        .single();
-      if (vErr || !newVisitor) {
-        throw new Error(vErr?.message || 'Gagal menyimpan data wisatawan');
-      }
+  createVisitor: async (
+    input: Omit<Visitor, 'id' | 'created_at' | 'credit_used' | 'photo_url'>,
+    uid: string
+  ): Promise<Visitor> => {
+    requireSupabaseConfig();
+    const photoUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(input.name)}`;
+    const { data: visitor, error: visitorError } = await supabase
+      .from('visitors')
+      .insert({
+        name: input.name,
+        phone: input.phone || null,
+        photo_url: photoUrl,
+        ticket_type: input.ticket_type,
+        credit_limit: input.credit_limit,
+        credit_used: 0,
+      })
+      .select()
+      .single();
 
-      // 2. Insert tag
-      const { error: tErr } = await supabase
-        .from('rfid_tags')
-        .insert({
-          uid: normalized,
-          visitor_id: newVisitor.id,
-          is_active: true,
-          registered_by: 'admin'
-        });
-      if (tErr) {
-        // Rollback visitor
-        await supabase.from('visitors').delete().eq('id', newVisitor.id);
-        throw new Error(tErr.message || 'Gagal meregistrasi tag RFID');
-      }
-      return newVisitor as Visitor;
+    if (visitorError || !visitor) {
+      throw new Error(visitorError?.message || 'Gagal menyimpan data wisatawan');
     }
-    const visitors = await db.getVisitors();
-    const tags = await db.getRFIDTags();
-    
-    const newVisitor: Visitor = {
-      id: `v-${Date.now()}`,
-      name: data.name,
-      phone: data.phone || null,
-      photo_url: photoUrl,
-      ticket_type: data.ticket_type,
-      credit_limit: data.credit_limit,
-      credit_used: 0,
-      created_at: new Date().toISOString(),
-    };
-    
-    const newTag: RFIDTag = {
-      id: `tag-${Date.now()}`,
-      uid: normalized,
-      visitor_id: newVisitor.id,
+
+    const { error: tagError } = await supabase.from('rfid_tags').insert({
+      uid: normalizeUID(uid),
+      visitor_id: visitor.id,
       is_active: true,
       registered_by: 'admin',
-      registered_at: new Date().toISOString(),
-    };
+    });
 
-    visitors.unshift(newVisitor);
-    tags.unshift(newTag);
-    
-    setStorageItem('ecotour_visitors', visitors);
-    setStorageItem('ecotour_rfid_tags', tags);
-    
-    return newVisitor;
+    if (tagError) {
+      await supabase.from('visitors').delete().eq('id', visitor.id);
+      throw new Error(tagError.message || 'Gagal meregistrasi tag RFID');
+    }
+
+    return visitor as Visitor;
   },
 
   resetVisitorCredit: async (id: string, limit: number, used: number): Promise<boolean> => {
-    if (isSupabaseConfigured) {
-      const { error } = await supabase
-        .from('visitors')
-        .update({ credit_limit: limit, credit_used: used })
-        .eq('id', id);
-      return !error;
-    }
-    const visitors = await db.getVisitors();
-    const idx = visitors.findIndex(v => v.id === id);
-    if (idx !== -1) {
-      visitors[idx].credit_limit = limit;
-      visitors[idx].credit_used = used;
-      setStorageItem('ecotour_visitors', visitors);
-      return true;
-    }
-    return false;
+    requireSupabaseConfig();
+    const { error } = await supabase
+      .from('visitors')
+      .update({ credit_limit: limit, credit_used: used })
+      .eq('id', id);
+    return !error;
   },
 
-  // Merchants
   getMerchants: async (): Promise<Merchant[]> => {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('merchants')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) {
-        console.error('[db.getMerchants] error:', error);
-        return [];
-      }
-      return data as Merchant[];
-    }
-    return getStorageItem<Merchant[]>('ecotour_merchants', MOCK_MERCHANTS);
+    requireSupabaseConfig();
+    const { data, error } = await supabase
+      .from('merchants')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data as Merchant[];
   },
 
-  createMerchant: async (merchantData: Omit<Merchant, 'id' | 'created_at' | 'is_active'>): Promise<Merchant> => {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('merchants')
-        .insert({
-          name: merchantData.name,
-          category: merchantData.category,
-          location: merchantData.location,
-          merchant_type: merchantData.merchant_type,
-          owner_user_id: merchantData.owner_user_id,
-          is_active: true
-        })
-        .select()
-        .single();
-      if (error || !data) {
-        throw new Error(error?.message || 'Gagal menyimpan merchant');
-      }
-      return data as Merchant;
-    }
-    const merchants = await db.getMerchants();
-    const newMerchant: Merchant = {
-      id: `m-${Date.now()}`,
-      name: merchantData.name,
-      category: merchantData.category,
-      location: merchantData.location,
-      merchant_type: merchantData.merchant_type,
-      owner_user_id: merchantData.owner_user_id || `u-${Date.now()}`,
-      is_active: true,
-      created_at: new Date().toISOString(),
-    };
-    merchants.unshift(newMerchant);
-    setStorageItem('ecotour_merchants', merchants);
-    return newMerchant;
-  },
-
-  updateMerchant: async (id: string, merchantData: { name: string; category: string; location: string; phone: string }): Promise<boolean> => {
-    if (isSupabaseConfigured) {
-      const { error } = await supabase
-        .from('merchants')
-        .update({
-          name: merchantData.name,
-          category: merchantData.category,
-          location: merchantData.location,
-          phone: merchantData.phone
-        })
-        .eq('id', id);
-      return !error;
-    }
-    const merchants = await db.getMerchants();
-    const idx = merchants.findIndex(m => m.id === id);
-    if (idx !== -1) {
-      merchants[idx].name = merchantData.name;
-      merchants[idx].category = merchantData.category;
-      merchants[idx].location = merchantData.location;
-      merchants[idx].phone = merchantData.phone;
-      setStorageItem('ecotour_merchants', merchants);
-      return true;
-    }
-    return false;
+  updateMerchant: async (
+    id: string,
+    merchant: { name: string; category: string; location: string; phone: string }
+  ): Promise<boolean> => {
+    requireSupabaseConfig();
+    const { error } = await supabase.from('merchants').update(merchant).eq('id', id);
+    return !error;
   },
 
   deleteMerchant: async (id: string): Promise<boolean> => {
-    if (isSupabaseConfigured) {
-      const res = await fetch('/api/admin/delete-merchant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      const resJson = await res.json();
-      return !!resJson.success;
-    }
-    const merchants = await db.getMerchants();
-    const filtered = merchants.filter(m => m.id !== id);
-    setStorageItem('ecotour_merchants', filtered);
-    
-    // Clean up offline mock credentials and profiles
-    if (typeof window !== 'undefined') {
-      const credentials = JSON.parse(window.localStorage.getItem('ecotour_credentials') || '[]');
-      const filteredCreds = credentials.filter((c: any) => c.merchant_id !== id);
-      window.localStorage.setItem('ecotour_credentials', JSON.stringify(filteredCreds));
-
-      const profiles = JSON.parse(window.localStorage.getItem('ecotour_profiles') || '[]');
-      const filteredProfs = profiles.filter((p: any) => p.merchant_id !== id);
-      window.localStorage.setItem('ecotour_profiles', JSON.stringify(filteredProfs));
-    }
-
-    return true;
+    const response = await fetch('/api/admin/delete-merchant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!response.ok) return false;
+    const result = await response.json();
+    return result.success === true;
   },
 
-  // Transactions
   getTransactions: async (): Promise<Transaction[]> => {
-    if (isSupabaseConfigured) {
-      const { data: txs, error: txErr } = await supabase
-        .from('transactions')
-        .select('*, merchant:merchants(name)')
-        .order('created_at', { ascending: false });
-        
-      if (txErr || !txs) {
-        console.error('[db.getTransactions] error:', txErr);
-        return [];
-      }
+    requireSupabaseConfig();
+    const { data: transactions, error } = await supabase
+      .from('transactions')
+      .select('*, merchant:merchants(name)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
 
-      const { data: tags } = await supabase.from('rfid_tags').select('*, visitor:visitors(name, phone, ticket_type)');
-      
-      return txs.map(tx => {
-        const tag = tags?.find(t => t.uid === tx.rfid_uid);
-        const visitor = tag?.visitor as any;
-        const merchant = tx.merchant as any;
-        
-        return {
-          id: tx.id,
-          rfid_uid: tx.rfid_uid,
-          merchant_id: tx.merchant_id,
-          type: tx.type,
-          amount: Number(tx.amount),
-          created_at: tx.created_at,
-          whatsapp_status: tx.whatsapp_status,
-          visitor_name: visitor?.name || 'Unknown',
-          visitor_phone: visitor?.phone || undefined,
-          ticket_type: visitor?.ticket_type || 'Regular',
-          merchant_name: merchant?.name || 'Unknown',
-        };
-      });
-    }
-    
-    const txs = getStorageItem<Transaction[]>('ecotour_transactions', MOCK_TRANSACTIONS);
-    const visitors = await db.getVisitors();
-    const tags = await db.getRFIDTags();
-    const merchants = await db.getMerchants();
-    
-    return txs.map(tx => {
-      const tag = tags.find(t => t.uid === tx.rfid_uid);
-      const visitor = tag ? visitors.find(v => v.id === tag.visitor_id) : null;
-      const merchant = merchants.find(m => m.id === tx.merchant_id);
-      
+    const { data: tags, error: tagsError } = await supabase
+      .from('rfid_tags')
+      .select('uid, visitor:visitors(name, phone, ticket_type)');
+    if (tagsError) throw tagsError;
+
+    return (transactions || []).map(transaction => {
+      const tag = tags?.find(item => item.uid === transaction.rfid_uid);
+      const visitor = tag?.visitor as unknown as Pick<Visitor, 'name' | 'phone' | 'ticket_type'> | null;
+      const merchant = transaction.merchant as unknown as Pick<Merchant, 'name'> | null;
       return {
-        ...tx,
+        id: transaction.id,
+        rfid_uid: transaction.rfid_uid,
+        merchant_id: transaction.merchant_id,
+        type: transaction.type,
+        amount: Number(transaction.amount),
+        created_at: transaction.created_at,
+        whatsapp_status: transaction.whatsapp_status,
         visitor_name: visitor?.name || 'Unknown',
         visitor_phone: visitor?.phone || undefined,
         ticket_type: visitor?.ticket_type || 'Regular',
@@ -378,216 +176,16 @@ export const db = {
         reason: null,
       };
     }
-    
+
     const remaining = visitor.credit_limit - visitor.credit_used;
-    const allowed = remaining >= amount;
-    
     return {
-      allowed,
+      allowed: remaining >= amount,
       credit_limit: visitor.credit_limit,
       credit_used: visitor.credit_used,
       credit_remaining: remaining,
-      reason: allowed ? null : `Saldo tidak cukup. Sisa: Rp ${remaining.toLocaleString('id-ID')}`,
-    };
-  },
-
-  createTransaction: async (txData: {
-    rfid_uid: string;
-    merchant_id: string;
-    amount: number;
-  }): Promise<{ success: boolean; transaction?: Transaction; error?: string }> => {
-    const normalizedUID = normalizeUID(txData.rfid_uid);
-    if (isSupabaseConfigured) {
-      const { data: tagData, error: tagErr } = await supabase
-        .from('rfid_tags')
-        .select('*, visitor:visitors(*)')
-        .eq('uid', normalizedUID)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (tagErr || !tagData) {
-        return { success: false, error: 'Tag RFID tidak terdaftar atau tidak aktif!' };
-      }
-      const visitor = tagData.visitor as Visitor;
-      if (!visitor) {
-        return { success: false, error: 'Wisatawan pemilik gelang tidak ditemukan!' };
-      }
-
-      const { data: merchant, error: mErr } = await supabase
-        .from('merchants')
-        .select('*')
-        .eq('id', txData.merchant_id)
-        .single();
-
-      if (mErr || !merchant) {
-        return { success: false, error: 'Merchant tidak terdaftar!' };
-      }
-      if (!merchant.is_active) {
-        return { success: false, error: 'Merchant partner sedang dinonaktifkan!' };
-      }
-
-      const txType = merchant.merchant_type === 'loket' ? 'entry' : 'payment';
-      const amountToCharge = txType === 'entry' ? 0 : txData.amount;
-
-      if (txType === 'payment') {
-        const check = db.checkCredit(visitor, amountToCharge);
-        if (!check.allowed) {
-          return { success: false, error: check.reason || 'Saldo gelang NFC tidak mencukupi!' };
-        }
-
-        const { error: updErr } = await supabase
-          .from('visitors')
-          .update({ credit_used: visitor.credit_used + amountToCharge })
-          .eq('id', visitor.id);
-        if (updErr) {
-          return { success: false, error: 'Gagal memperbarui saldo wisatawan!' };
-        }
-      }
-
-      const { data: newTx, error: txErr } = await supabase
-        .from('transactions')
-        .insert({
-          rfid_uid: normalizedUID,
-          merchant_id: merchant.id,
-          type: txType,
-          amount: amountToCharge,
-          whatsapp_status: visitor.phone ? 'pending' : 'not_applicable'
-        })
-        .select()
-        .single();
-
-      if (txErr || !newTx) {
-        if (txType === 'payment') {
-          await supabase.from('visitors').update({ credit_used: visitor.credit_used }).eq('id', visitor.id);
-        }
-        return { success: false, error: 'Gagal menyimpan transaksi!' };
-      }
-
-      if (visitor.phone) {
-        fetch('/api/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: visitor.phone,
-            name: visitor.name,
-            merchantName: merchant.name,
-            amount: amountToCharge,
-            creditLeft: visitor.credit_limit === 0 ? 'Unlimited' : (visitor.credit_limit - (visitor.credit_used + amountToCharge)),
-            transactionType: txType,
-          }),
-        }).then(async (r) => {
-          const resJson = await r.json();
-          await supabase
-            .from('transactions')
-            .update({ whatsapp_status: resJson.success ? 'sent' : 'failed' })
-            .eq('id', newTx.id);
-        }).catch(err => console.warn('WA dispatch failed', err));
-      }
-
-      return {
-        success: true,
-        transaction: {
-          id: newTx.id,
-          rfid_uid: newTx.rfid_uid,
-          merchant_id: newTx.merchant_id,
-          type: newTx.type,
-          amount: Number(newTx.amount),
-          created_at: newTx.created_at,
-          whatsapp_status: newTx.whatsapp_status,
-          visitor_name: visitor.name,
-          visitor_phone: visitor.phone || undefined,
-          ticket_type: visitor.ticket_type,
-          merchant_name: merchant.name,
-        },
-      };
-    }
-    
-    const visitors = await db.getVisitors();
-    const tags = await db.getRFIDTags();
-    const merchants = await db.getMerchants();
-    const transactions = getStorageItem<Transaction[]>('ecotour_transactions', MOCK_TRANSACTIONS);
-
-    const tag = tags.find(t => t.uid === normalizedUID && t.is_active);
-    if (!tag) {
-      return { success: false, error: 'Tag RFID tidak terdaftar atau tidak aktif!' };
-    }
-
-    const visitor = visitors.find(v => v.id === tag.visitor_id);
-    if (!visitor) {
-      return { success: false, error: 'Wisatawan pemilik gelang tidak ditemukan!' };
-    }
-
-    const merchant = merchants.find(m => m.id === txData.merchant_id);
-    if (!merchant) {
-      return { success: false, error: 'Merchant tidak terdaftar!' };
-    }
-
-    if (!merchant.is_active) {
-      return { success: false, error: 'Merchant partner sedang dinonaktifkan!' };
-    }
-
-    const txType = merchant.merchant_type === 'loket' ? 'entry' : 'payment';
-    const amountToCharge = txType === 'entry' ? 0 : txData.amount;
-
-    if (txType === 'payment') {
-      const check = db.checkCredit(visitor, amountToCharge);
-      if (!check.allowed) {
-        return { success: false, error: check.reason || 'Saldo gelang NFC tidak mencukupi!' };
-      }
-    }
-
-    visitor.credit_used += amountToCharge;
-    setStorageItem('ecotour_visitors', visitors);
-
-    const newTx: Transaction = {
-      id: `tx-${Date.now()}`,
-      rfid_uid: normalizedUID,
-      merchant_id: merchant.id,
-      type: txType,
-      amount: amountToCharge,
-      created_at: new Date().toISOString(),
-      whatsapp_status: visitor.phone ? 'pending' : 'not_applicable',
-    };
-
-    transactions.unshift(newTx);
-    setStorageItem('ecotour_transactions', transactions);
-
-    if (visitor.phone) {
-      try {
-        fetch('/api/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: visitor.phone,
-            name: visitor.name,
-            merchantName: merchant.name,
-            amount: amountToCharge,
-            creditLeft: visitor.credit_limit === 0 ? 'Unlimited' : (visitor.credit_limit - visitor.credit_used),
-            transactionType: txType,
-          }),
-        }).then(async (r) => {
-          const resJson = await r.json();
-          const updatedTxs = getStorageItem<Transaction[]>('ecotour_transactions', MOCK_TRANSACTIONS);
-          const tIdx = updatedTxs.findIndex(t => t.id === newTx.id);
-          if (tIdx !== -1) {
-            updatedTxs[tIdx].whatsapp_status = resJson.success ? 'sent' : 'failed';
-            setStorageItem('ecotour_transactions', updatedTxs);
-          }
-        }).catch(err => console.warn('WA dispatch failed', err));
-      } catch {
-        // ignore
-      }
-    }
-
-    return {
-      success: true,
-      transaction: {
-        ...newTx,
-        visitor_name: visitor.name,
-        visitor_phone: visitor.phone || undefined,
-        ticket_type: visitor.ticket_type,
-        merchant_name: merchant.name,
-      },
+      reason: remaining >= amount
+        ? null
+        : `Saldo tidak cukup. Sisa: Rp ${remaining.toLocaleString('id-ID')}`,
     };
   },
 };

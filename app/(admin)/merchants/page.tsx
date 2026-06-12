@@ -1,266 +1,206 @@
 'use client';
-
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { db, isSupabaseConfigured } from '@/lib/supabase';
+import { db } from '@/lib/supabase';
 import { Merchant } from '@/types';
 import { createMerchantSchema, CreateMerchantInput } from '@/lib/validations';
 import { toggleMerchantStatus } from '@/lib/services/merchantService';
 import { formatPhoneForWA, formatDatetime } from '@/lib/utils';
-
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Toaster, toast } from '@/components/ui/Toast';
-import { Plus, ToggleLeft, Store, MapPin, ShieldAlert, Key, Phone, Calendar, Pencil, Trash2 } from 'lucide-react';
-
+import { Plus, Store, MapPin, ShieldAlert, Key, Phone, Calendar, Pencil, Trash2 } from 'lucide-react';
 export default function AdminMerchantsPage() {
-  const [merchants, setMerchants] = useState<Merchant[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-
-  // Modals state
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [editMerchantData, setEditMerchantData] = useState<Merchant | null>(null);
-  const [confirmDeleteData, setConfirmDeleteData] = useState<Merchant | null>(null);
-
-  // Toggle status dialog state
-  const [confirmToggleData, setConfirmToggleData] = useState<{
-    id: string;
-    name: string;
-    isActive: boolean;
-  } | null>(null);
-
-  // Success credentials modal state
-  const [generatedCredentials, setGeneratedCredentials] = useState<{
-    email: string;
-    pass: string;
-    name: string;
-  } | null>(null);
-
-  // Detail modal state
-  const [selectedMerchantDetail, setSelectedMerchantDetail] = useState<Merchant | null>(null);
-
-  // Form setup for create merchant
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<CreateMerchantInput>({
-    resolver: zodResolver(createMerchantSchema),
-    mode: 'onBlur',
-    defaultValues: {
-      name: '',
-      category: 'F&B',
-      location: '',
-      merchant_type: 'regular',
-      phone: '',
-      owner_email: '',
-      owner_password: 'WAVR2025!',
-    }
-  });
-
-  useEffect(() => {
-    loadMerchants();
-  }, []);
-
-  const loadMerchants = async () => {
-    setLoading(true);
-    try {
-      const data = await db.getMerchants();
-      setMerchants(data);
-    } catch (err) {
-      toast.error('Gagal mengambil daftar merchant');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleToggleClick = (m: Merchant) => {
-    setConfirmToggleData({
-      id: m.id,
-      name: m.name,
-      isActive: m.is_active,
-    });
-  };
-
-  const handleConfirmToggle = async () => {
-    if (!confirmToggleData) return;
-    setUpdatingId(confirmToggleData.id);
-
-    try {
-      const res = await toggleMerchantStatus(confirmToggleData.id);
-      if (res.success) {
-        toast.success(`Merchant ${confirmToggleData.name} berhasil ${confirmToggleData.isActive ? 'dinonaktifkan' : 'diaktifkan'}`);
-        await loadMerchants();
-      } else {
-        toast.error(res.error || 'Gagal mengubah status merchant');
-      }
-    } catch (err) {
-      toast.error('Gagal mengubah status');
-    } finally {
-      setUpdatingId(null);
-      setConfirmToggleData(null);
-    }
-  };
-
-  const handleCreateClick = () => {
-    setEditMerchantData(null);
-    reset({
-      name: '',
-      category: 'F&B',
-      location: '',
-      merchant_type: 'regular',
-      phone: '',
-      owner_email: '',
-      owner_password: 'WAVR2025!',
-    });
-    setIsCreateModalOpen(true);
-  };
-
-  const handleEditClick = (m: Merchant) => {
-    setEditMerchantData(m);
-    setValue('name', m.name);
-    setValue('category', m.category as any);
-    setValue('location', m.location);
-    setValue('merchant_type', m.merchant_type as any);
-    setValue('phone', m.phone || '');
-    // Pre-fill email and password with dummy values to bypass schema validation
-    setValue('owner_email', 'dummy@email.com');
-    setValue('owner_password', 'dummyPassword123');
-    setIsCreateModalOpen(true);
-  };
-
-  const handleDeleteClick = (m: Merchant) => {
-    setConfirmDeleteData(m);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!confirmDeleteData) return;
-    try {
-      const success = await db.deleteMerchant(confirmDeleteData.id);
-      if (success) {
-        toast.success(`Merchant ${confirmDeleteData.name} berhasil dihapus`);
-        await loadMerchants();
-      } else {
-        toast.error('Gagal menghapus merchant');
-      }
-    } catch (err) {
-      toast.error('Terjadi kesalahan saat menghapus merchant');
-    } finally {
-      setConfirmDeleteData(null);
-    }
-  };
-
-  const onCreateSubmit = async (data: CreateMerchantInput) => {
-    try {
-      if (editMerchantData) {
-        // Edit flow
-        const success = await db.updateMerchant(editMerchantData.id, {
-          name: data.name,
-          category: data.category,
-          location: data.location,
-          phone: data.phone,
-        });
-
-        if (success) {
-          toast.success(`Informasi merchant ${data.name} berhasil diperbarui`);
-          setIsCreateModalOpen(false);
-          setEditMerchantData(null);
-          reset();
-          await loadMerchants();
-        } else {
-          toast.error('Gagal memperbarui merchant');
+    const [merchants, setMerchants] = useState<Merchant[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [updatingId, setUpdatingId] = useState<string | null>(null);
+    // Modals state
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [editMerchantData, setEditMerchantData] = useState<Merchant | null>(null);
+    const [confirmDeleteData, setConfirmDeleteData] = useState<Merchant | null>(null);
+    // Toggle status dialog state
+    const [confirmToggleData, setConfirmToggleData] = useState<{
+        id: string;
+        name: string;
+        isActive: boolean;
+    } | null>(null);
+    // Success credentials modal state
+    const [generatedCredentials, setGeneratedCredentials] = useState<{
+        email: string;
+        pass: string;
+        name: string;
+    } | null>(null);
+    // Detail modal state
+    const [selectedMerchantDetail, setSelectedMerchantDetail] = useState<Merchant | null>(null);
+    // Form setup for create merchant
+    const { register, handleSubmit, setValue, reset, formState: { errors, isSubmitting }, } = useForm<CreateMerchantInput>({
+        resolver: zodResolver(createMerchantSchema),
+        mode: 'onBlur',
+        defaultValues: {
+            name: '',
+            category: 'F&B',
+            location: '',
+            merchant_type: 'regular',
+            phone: '',
+            owner_email: '',
+            owner_password: 'WAVR2025!',
         }
-        return;
-      }
-
-      // Create flow
-      if (isSupabaseConfigured) {
-        // Real API provisioning call
-        const res = await fetch('/api/admin/create-merchant', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        const resJson = await res.json();
-        if (resJson.success) {
-          setGeneratedCredentials({
-            email: data.owner_email,
-            pass: data.owner_password,
-            name: data.name,
-          });
-          setIsCreateModalOpen(false);
-          reset();
-          await loadMerchants();
-        } else {
-          toast.error(resJson.error || 'Gagal membuat merchant');
+    });
+    async function loadMerchants() {
+        setLoading(true);
+        try {
+            const data = await db.getMerchants();
+            setMerchants(data);
         }
-      } else {
-        // simulation
-        const mockMerchant = await db.createMerchant({
-          name: data.name,
-          category: data.category,
-          location: data.location,
-          merchant_type: data.merchant_type,
-          owner_user_id: `u-${data.owner_email.replace(/@/g, '_')}`,
-        });
-
-        // Add dummy profiles for demo
-        const profiles = JSON.parse(window.localStorage.getItem('ecotour_profiles') || '[]');
-        profiles.push({
-          id: mockMerchant.owner_user_id,
-          role: 'merchant',
-          merchant_id: mockMerchant.id,
-          merchant_type: mockMerchant.merchant_type,
-          created_at: new Date().toISOString()
-        });
-        window.localStorage.setItem('ecotour_profiles', JSON.stringify(profiles));
-
-        // Sync storage credentials
-        const credentialsList = JSON.parse(window.localStorage.getItem('ecotour_credentials') || '[]');
-        credentialsList.push({
-          email: data.owner_email,
-          role: 'merchant',
-          merchant_id: mockMerchant.id,
-          merchant_type: mockMerchant.merchant_type,
-        });
-        window.localStorage.setItem('ecotour_credentials', JSON.stringify(credentialsList));
-
-        setGeneratedCredentials({
-          email: data.owner_email,
-          pass: data.owner_password,
-          name: data.name,
-        });
-        setIsCreateModalOpen(false);
-        reset();
-        await loadMerchants();
-      }
-    } catch (err) {
-      toast.error('Kendala koneksi, gagal memproses data merchant');
+        catch {
+            toast.error('Gagal mengambil daftar merchant');
+        }
+        finally {
+            setLoading(false);
+        }
     }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex flex-col gap-6 w-full animate-pulse">
+    useEffect(() => {
+        void loadMerchants();
+    }, []);
+    const handleToggleClick = (m: Merchant) => {
+        setConfirmToggleData({
+            id: m.id,
+            name: m.name,
+            isActive: m.is_active,
+        });
+    };
+    const handleConfirmToggle = async () => {
+        if (!confirmToggleData)
+            return;
+        setUpdatingId(confirmToggleData.id);
+        try {
+            const res = await toggleMerchantStatus(confirmToggleData.id);
+            if (res.success) {
+                toast.success(`Merchant ${confirmToggleData.name} berhasil ${confirmToggleData.isActive ? 'dinonaktifkan' : 'diaktifkan'}`);
+                await loadMerchants();
+            }
+            else {
+                toast.error(res.error || 'Gagal mengubah status merchant');
+            }
+        }
+        catch {
+            toast.error('Gagal mengubah status');
+        }
+        finally {
+            setUpdatingId(null);
+            setConfirmToggleData(null);
+        }
+    };
+    const handleCreateClick = () => {
+        setEditMerchantData(null);
+        reset({
+            name: '',
+            category: 'F&B',
+            location: '',
+            merchant_type: 'regular',
+            phone: '',
+            owner_email: '',
+            owner_password: 'WAVR2025!',
+        });
+        setIsCreateModalOpen(true);
+    };
+    const handleEditClick = (m: Merchant) => {
+        setEditMerchantData(m);
+        setValue('name', m.name);
+        setValue('category', m.category as CreateMerchantInput['category']);
+        setValue('location', m.location);
+        setValue('merchant_type', m.merchant_type);
+        setValue('phone', m.phone || '');
+        // Pre-fill email and password with dummy values to bypass schema validation
+        setValue('owner_email', 'dummy@email.com');
+        setValue('owner_password', 'dummyPassword123');
+        setIsCreateModalOpen(true);
+    };
+    const handleDeleteClick = (m: Merchant) => {
+        setConfirmDeleteData(m);
+    };
+    const handleConfirmDelete = async () => {
+        if (!confirmDeleteData)
+            return;
+        try {
+            const success = await db.deleteMerchant(confirmDeleteData.id);
+            if (success) {
+                toast.success(`Merchant ${confirmDeleteData.name} berhasil dihapus`);
+                await loadMerchants();
+            }
+            else {
+                toast.error('Gagal menghapus merchant');
+            }
+        }
+        catch {
+            toast.error('Terjadi kesalahan saat menghapus merchant');
+        }
+        finally {
+            setConfirmDeleteData(null);
+        }
+    };
+    const onCreateSubmit = async (data: CreateMerchantInput) => {
+        try {
+            if (editMerchantData) {
+                // Edit flow
+                const success = await db.updateMerchant(editMerchantData.id, {
+                    name: data.name,
+                    category: data.category,
+                    location: data.location,
+                    phone: data.phone,
+                });
+                if (success) {
+                    toast.success(`Informasi merchant ${data.name} berhasil diperbarui`);
+                    setIsCreateModalOpen(false);
+                    setEditMerchantData(null);
+                    reset();
+                    await loadMerchants();
+                }
+                else {
+                    toast.error('Gagal memperbarui merchant');
+                }
+                return;
+            }
+            // Real API provisioning call
+            const res = await fetch('/api/admin/create-merchant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            const resJson = await res.json();
+            if (resJson.success) {
+                setGeneratedCredentials({
+                    email: data.owner_email,
+                    pass: data.owner_password,
+                    name: data.name,
+                });
+                setIsCreateModalOpen(false);
+                reset();
+                await loadMerchants();
+            }
+            else {
+                toast.error(resJson.error || 'Gagal membuat merchant');
+            }
+        }
+        catch {
+            toast.error('Kendala koneksi, gagal memproses data merchant');
+        }
+    };
+    if (loading) {
+        return (<div className="flex flex-col gap-6 w-full animate-pulse">
         <div className="flex justify-between items-center">
-          <div className="h-8 w-48 bg-slate-200 rounded" />
-          <div className="h-10 w-36 bg-slate-200 rounded" />
+          <div className="h-8 w-48 bg-slate-200 rounded"/>
+          <div className="h-10 w-36 bg-slate-200 rounded"/>
         </div>
-        <div className="h-96 bg-white border border-[#e5e3db] rounded-2xl" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-6 text-left">
-      <Toaster position="top-center" richColors />
+        <div className="h-96 bg-white border border-[#e5e3db] rounded-2xl"/>
+      </div>);
+    }
+    return (<div className="flex flex-col gap-6 text-left">
+      <Toaster position="top-center" richColors/>
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
@@ -272,11 +212,8 @@ export default function AdminMerchantsPage() {
             Daftar Gerbang & Regular Merchant
           </h1>
         </div>
-        <Button
-          onClick={handleCreateClick}
-          className="flex items-center gap-2 text-xs font-bold cursor-pointer"
-        >
-          <Plus className="h-4.5 w-4.5" /> Tambah Merchant
+        <Button onClick={handleCreateClick} className="flex items-center gap-2 text-xs font-bold cursor-pointer">
+          <Plus className="h-4.5 w-4.5"/> Tambah Merchant
         </Button>
       </div>
 
@@ -296,17 +233,13 @@ export default function AdminMerchantsPage() {
               </tr>
             </thead>
             <tbody>
-              {merchants.map((m) => (
-                <tr key={m.id} className="border-b border-[#f7f7f5] hover:bg-[#f7f7f5]/30 transition-colors">
-                  <td 
-                    onClick={() => setSelectedMerchantDetail(m)}
-                    className="py-3 px-4 font-bold text-[#1e293b] flex items-center gap-2 cursor-pointer hover:text-[#29ABE2] transition-colors"
-                  >
-                    <Store className="h-4 w-4 text-[#29ABE2]" /> {m.name}
+              {merchants.map((m) => (<tr key={m.id} className="border-b border-[#f7f7f5] hover:bg-[#f7f7f5]/30 transition-colors">
+                  <td onClick={() => setSelectedMerchantDetail(m)} className="py-3 px-4 font-bold text-[#1e293b] flex items-center gap-2 cursor-pointer hover:text-[#29ABE2] transition-colors">
+                    <Store className="h-4 w-4 text-[#29ABE2]"/> {m.name}
                   </td>
                   <td className="py-3 px-2 text-gray-500 font-semibold">{m.category}</td>
                   <td className="py-3 px-2 text-[#64748b] font-medium flex items-center gap-1 mt-1">
-                    <MapPin className="h-3.5 w-3.5" /> {m.location}
+                    <MapPin className="h-3.5 w-3.5"/> {m.location}
                   </td>
                   <td className="py-3 px-2">
                     <Badge variant={m.merchant_type === 'loket' ? 'VIP' : 'Family'}>
@@ -314,19 +247,10 @@ export default function AdminMerchantsPage() {
                     </Badge>
                   </td>
                   <td className="py-3 px-2 font-medium text-slate-600">
-                    {m.phone ? (
-                      <a
-                        href={`https://wa.me/${formatPhoneForWA(m.phone)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 hover:text-[#29ABE2] hover:underline"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#29ABE2] animate-pulse" />
+                    {m.phone ? (<a href={`https://wa.me/${formatPhoneForWA(m.phone)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-[#29ABE2] hover:underline">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#29ABE2] animate-pulse"/>
                         {m.phone}
-                      </a>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
+                      </a>) : (<span className="text-gray-400">-</span>)}
                   </td>
                   <td className="py-3 px-2 text-center">
                     <Badge variant={m.is_active ? 'success' : 'error'}>
@@ -334,87 +258,47 @@ export default function AdminMerchantsPage() {
                     </Badge>
                   </td>
                   <td className="py-3 px-4 text-right flex items-center justify-end gap-1.5">
-                    <Button
-                      onClick={() => setSelectedMerchantDetail(m)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-[#29ABE2] hover:bg-[#E8F6FD] border border-[#29ABE2]/20 font-bold px-2 py-1 rounded-lg"
-                    >
+                    <Button onClick={() => setSelectedMerchantDetail(m)} variant="ghost" size="sm" className="text-[#29ABE2] hover:bg-[#E8F6FD] border border-[#29ABE2]/20 font-bold px-2 py-1 rounded-lg">
                       Detail
                     </Button>
-                    <Button
-                      onClick={() => handleEditClick(m)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-blue-600 hover:bg-blue-50 border border-blue-200 font-bold px-2 py-1 rounded-lg flex items-center gap-1"
-                    >
-                      <Pencil className="h-3 w-3" /> Edit
+                    <Button onClick={() => handleEditClick(m)} variant="ghost" size="sm" className="text-blue-600 hover:bg-blue-50 border border-blue-200 font-bold px-2 py-1 rounded-lg flex items-center gap-1">
+                      <Pencil className="h-3 w-3"/> Edit
                     </Button>
-                    <Button
-                      onClick={() => handleDeleteClick(m)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:bg-red-50 border border-red-200 font-bold px-2 py-1 rounded-lg flex items-center gap-1"
-                    >
-                      <Trash2 className="h-3 w-3" /> Hapus
+                    <Button onClick={() => handleDeleteClick(m)} variant="ghost" size="sm" className="text-red-600 hover:bg-red-50 border border-red-200 font-bold px-2 py-1 rounded-lg flex items-center gap-1">
+                      <Trash2 className="h-3 w-3"/> Hapus
                     </Button>
-                    <Button
-                      onClick={() => handleToggleClick(m)}
-                      disabled={updatingId === m.id}
-                      variant="ghost"
-                      size="sm"
-                      className={`text-[10px] font-bold border rounded-lg cursor-pointer ${
-                        m.is_active 
-                          ? 'border-red-200 text-red-500 bg-red-50 hover:bg-red-100' 
-                          : 'border-green-200 text-green-500 bg-green-50 hover:bg-green-100'
-                      }`}
-                    >
+                    <Button onClick={() => handleToggleClick(m)} disabled={updatingId === m.id} variant="ghost" size="sm" className={`text-[10px] font-bold border rounded-lg cursor-pointer ${m.is_active
+                ? 'border-red-200 text-red-500 bg-red-50 hover:bg-red-100'
+                : 'border-green-200 text-green-500 bg-green-50 hover:bg-green-100'}`}>
                       {m.is_active ? 'Nonaktifkan' : 'Aktifkan'}
                     </Button>
                   </td>
-                </tr>
-              ))}
-              {merchants.length === 0 && (
-                <tr>
+                </tr>))}
+              {merchants.length === 0 && (<tr>
                   <td colSpan={7} className="text-center py-16 text-gray-400">
                     Tidak ada merchant wisata terdaftar.
                   </td>
-                </tr>
-              )}
+                </tr>)}
             </tbody>
           </table>
         </div>
       </div>
 
       {/* Modal 1: Create Merchant Form */}
-      <Modal
-        isOpen={isCreateModalOpen}
-        onClose={() => {
-          setIsCreateModalOpen(false);
-          setEditMerchantData(null);
-          reset();
-        }}
-        title={editMerchantData ? 'Edit Informasi Partner' : 'Daftarkan Merchant Baru'}
-      >
+      <Modal isOpen={isCreateModalOpen} onClose={() => {
+            setIsCreateModalOpen(false);
+            setEditMerchantData(null);
+            reset();
+        }} title={editMerchantData ? 'Edit Informasi Partner' : 'Daftarkan Merchant Baru'}>
         <form onSubmit={handleSubmit(onCreateSubmit)} className="flex flex-col gap-4 text-left">
-          <Input
-            label="Nama Merchant Partner *"
-            placeholder="Contoh: Zipline Canopy B"
-            error={errors.name?.message}
-            disabled={isSubmitting}
-            {...register('name')}
-          />
+          <Input label="Nama Merchant Partner *" placeholder="Contoh: Zipline Canopy B" error={errors.name?.message} disabled={isSubmitting} {...register('name')}/>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748b]">
                 Kategori Kios
               </label>
-              <select
-                disabled={isSubmitting}
-                className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]"
-                {...register('category')}
-              >
+              <select disabled={isSubmitting} className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]" {...register('category')}>
                 <option value="Adventure">Adventure</option>
                 <option value="F&B">F&B</option>
                 <option value="Retail">Retail</option>
@@ -427,73 +311,32 @@ export default function AdminMerchantsPage() {
               <label className="text-xs font-bold uppercase tracking-wider text-[#64748b]">
                 Tipe Merchant
               </label>
-              <select
-                disabled={isSubmitting}
-                className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]"
-                {...register('merchant_type')}
-              >
+              <select disabled={isSubmitting} className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]" {...register('merchant_type')}>
                 <option value="regular">Regular (Belanja)</option>
                 <option value="loket">Loket (Entry Gate)</option>
               </select>
             </div>
           </div>
 
-          <Input
-            label="Lokasi Pos Area *"
-            placeholder="Contoh: Plaza Utama Kios #1"
-            error={errors.location?.message}
-            disabled={isSubmitting}
-            {...register('location')}
-          />
+          <Input label="Lokasi Pos Area *" placeholder="Contoh: Plaza Utama Kios #1" error={errors.location?.message} disabled={isSubmitting} {...register('location')}/>
 
-          <Input
-            label="Nomor HP Owner (WhatsApp) *"
-            placeholder="Contoh: 081234567890"
-            error={errors.phone?.message}
-            disabled={isSubmitting}
-            {...register('phone')}
-          />
+          <Input label="Nomor HP Owner (WhatsApp) *" placeholder="Contoh: 081234567890" error={errors.phone?.message} disabled={isSubmitting} {...register('phone')}/>
 
           <div className={editMerchantData ? 'hidden' : 'flex flex-col gap-4'}>
-            <Input
-              label="Email Owner Merchant *"
-              type="email"
-              placeholder="owner@zipline.com"
-              error={errors.owner_email?.message}
-              disabled={isSubmitting}
-              {...register('owner_email')}
-            />
+            <Input label="Email Owner Merchant *" type="email" placeholder="owner@zipline.com" error={errors.owner_email?.message} disabled={isSubmitting} {...register('owner_email')}/>
 
-            <Input
-              label="Kata Sandi Owner *"
-              type="password"
-              placeholder="Minimal 8 karakter"
-              error={errors.owner_password?.message}
-              disabled={isSubmitting}
-              {...register('owner_password')}
-            />
+            <Input label="Kata Sandi Owner *" type="password" placeholder="Minimal 8 karakter" error={errors.owner_password?.message} disabled={isSubmitting} {...register('owner_password')}/>
           </div>
 
           <div className="flex gap-2.5 pt-3">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setIsCreateModalOpen(false);
-                setEditMerchantData(null);
-                reset();
-              }}
-              disabled={isSubmitting}
-              className="w-1/3 text-xs border border-[#e5e3db] font-bold"
-            >
+            <Button type="button" variant="ghost" onClick={() => {
+            setIsCreateModalOpen(false);
+            setEditMerchantData(null);
+            reset();
+        }} disabled={isSubmitting} className="w-1/3 text-xs border border-[#e5e3db] font-bold">
               Batal
             </Button>
-            <Button
-              type="submit"
-              loading={isSubmitting}
-              disabled={isSubmitting}
-              className="w-2/3 text-xs font-bold"
-            >
+            <Button type="submit" loading={isSubmitting} disabled={isSubmitting} className="w-2/3 text-xs font-bold">
               {editMerchantData ? 'Simpan Perubahan' : 'Tambah Partner'}
             </Button>
           </div>
@@ -501,15 +344,10 @@ export default function AdminMerchantsPage() {
       </Modal>
 
       {/* Modal 2: Generated Credentials details */}
-      <Modal
-        isOpen={generatedCredentials !== null}
-        onClose={() => setGeneratedCredentials(null)}
-        title="Merchant Berhasil Dibuat"
-      >
-        {generatedCredentials && (
-          <div className="flex flex-col items-center text-center gap-5">
+      <Modal isOpen={generatedCredentials !== null} onClose={() => setGeneratedCredentials(null)} title="Merchant Berhasil Dibuat">
+        {generatedCredentials && (<div className="flex flex-col items-center text-center gap-5">
             <div className="w-16 h-16 rounded-full bg-[#E8F6FD] border border-[#29ABE2]/20 flex items-center justify-center text-[#29ABE2] shadow-xs">
-              <Key className="h-8 w-8" />
+              <Key className="h-8 w-8"/>
             </div>
 
             <div className="space-y-1 text-xs">
@@ -539,32 +377,22 @@ export default function AdminMerchantsPage() {
             </div>
 
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-medium p-3 rounded-xl flex items-start gap-2 text-left leading-relaxed">
-              <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
+              <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5 text-amber-500"/>
               <span>Penting: Pastikan Anda mencatat kredensial di atas sebelum menutup dialog ini.</span>
             </div>
 
-            <Button
-              variant="primary"
-              onClick={() => setGeneratedCredentials(null)}
-              className="w-full text-xs font-bold mt-2"
-            >
+            <Button variant="primary" onClick={() => setGeneratedCredentials(null)} className="w-full text-xs font-bold mt-2">
               Saya Mengerti & Sudah Mencatat
             </Button>
-          </div>
-        )}
+          </div>)}
       </Modal>
 
       {/* Modal 3: Merchant Details View */}
-      <Modal
-        isOpen={selectedMerchantDetail !== null}
-        onClose={() => setSelectedMerchantDetail(null)}
-        title="Detail Informasi Merchant"
-      >
-        {selectedMerchantDetail && (
-          <div className="flex flex-col gap-4 text-left text-xs font-bold text-slate-700">
+      <Modal isOpen={selectedMerchantDetail !== null} onClose={() => setSelectedMerchantDetail(null)} title="Detail Informasi Merchant">
+        {selectedMerchantDetail && (<div className="flex flex-col gap-4 text-left text-xs font-bold text-slate-700">
             <div className="flex items-center gap-3 p-4 bg-slate-50 border border-[#e5e3db] rounded-2xl">
               <div className="w-12 h-12 rounded-xl bg-[#E8F6FD] flex items-center justify-center text-[#29ABE2]">
-                <Store className="h-6 w-6" />
+                <Store className="h-6 w-6"/>
               </div>
               <div>
                 <h4 className="text-sm font-black text-[#1e293b]">{selectedMerchantDetail.name}</h4>
@@ -588,24 +416,15 @@ export default function AdminMerchantsPage() {
             <div className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-wider text-slate-400">Lokasi Pos Kios</span>
               <span className="text-slate-800 flex items-center gap-1 mt-0.5 font-black text-[#1e293b]">
-                <MapPin className="h-3.5 w-3.5 text-slate-400" /> {selectedMerchantDetail.location}
+                <MapPin className="h-3.5 w-3.5 text-slate-400"/> {selectedMerchantDetail.location}
               </span>
             </div>
 
             <div className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-wider text-slate-400">Nomor WhatsApp Owner</span>
-              {selectedMerchantDetail.phone ? (
-                <a
-                  href={`https://wa.me/${formatPhoneForWA(selectedMerchantDetail.phone)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[#29ABE2] hover:underline flex items-center gap-1 mt-0.5"
-                >
-                  <Phone className="h-3.5 w-3.5 text-[#29ABE2]" /> {selectedMerchantDetail.phone} (Hubungi)
-                </a>
-              ) : (
-                <span className="text-slate-400 font-medium">-</span>
-              )}
+              {selectedMerchantDetail.phone ? (<a href={`https://wa.me/${formatPhoneForWA(selectedMerchantDetail.phone)}`} target="_blank" rel="noopener noreferrer" className="text-[#29ABE2] hover:underline flex items-center gap-1 mt-0.5">
+                  <Phone className="h-3.5 w-3.5 text-[#29ABE2]"/> {selectedMerchantDetail.phone} (Hubungi)
+                </a>) : (<span className="text-slate-400 font-medium">-</span>)}
             </div>
 
             <div className="flex flex-col gap-1">
@@ -623,7 +442,7 @@ export default function AdminMerchantsPage() {
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] uppercase tracking-wider text-slate-400">Terdaftar Pada</span>
                 <span className="text-slate-650 flex items-center gap-1 mt-0.5 text-[#1e293b]">
-                  <Calendar className="h-3.5 w-3.5 text-slate-400" /> {formatDatetime(selectedMerchantDetail.created_at)}
+                  <Calendar className="h-3.5 w-3.5 text-slate-400"/> {formatDatetime(selectedMerchantDetail.created_at)}
                 </span>
               </div>
             </div>
@@ -633,29 +452,13 @@ export default function AdminMerchantsPage() {
                 Tutup Detail
               </Button>
             </div>
-          </div>
-        )}
+          </div>)}
       </Modal>
 
       {/* Toggle status confirmation dialog */}
-      <ConfirmDialog
-        isOpen={confirmToggleData !== null}
-        onClose={() => setConfirmToggleData(null)}
-        onConfirm={handleConfirmToggle}
-        title="Ubah Status Merchant"
-        message={confirmToggleData ? `Yakin ${confirmToggleData.isActive ? 'nonaktifkan' : 'aktifkan'} merchant ${confirmToggleData.name}? ${confirmToggleData.isActive ? 'Merchant tidak akan bisa mencatat transaksi tap gelang NFC.' : 'Merchant akan aktif kembali untuk tap.'}` : ''}
-        confirmLabel={confirmToggleData?.isActive ? 'Nonaktifkan' : 'Aktifkan'}
-      />
+      <ConfirmDialog isOpen={confirmToggleData !== null} onClose={() => setConfirmToggleData(null)} onConfirm={handleConfirmToggle} title="Ubah Status Merchant" message={confirmToggleData ? `Yakin ${confirmToggleData.isActive ? 'nonaktifkan' : 'aktifkan'} merchant ${confirmToggleData.name}? ${confirmToggleData.isActive ? 'Merchant tidak akan bisa mencatat transaksi tap gelang NFC.' : 'Merchant akan aktif kembali untuk tap.'}` : ''} confirmLabel={confirmToggleData?.isActive ? 'Nonaktifkan' : 'Aktifkan'}/>
 
       {/* Delete merchant confirmation dialog */}
-      <ConfirmDialog
-        isOpen={confirmDeleteData !== null}
-        onClose={() => setConfirmDeleteData(null)}
-        onConfirm={handleConfirmDelete}
-        title="Hapus Merchant"
-        message={confirmDeleteData ? `Yakin ingin menghapus merchant ${confirmDeleteData.name}? Tindakan ini akan menghapus data merchant dan akun login owner secara permanen.` : ''}
-        confirmLabel="Hapus"
-      />
-    </div>
-  );
+      <ConfirmDialog isOpen={confirmDeleteData !== null} onClose={() => setConfirmDeleteData(null)} onConfirm={handleConfirmDelete} title="Hapus Merchant" message={confirmDeleteData ? `Yakin ingin menghapus merchant ${confirmDeleteData.name}? Tindakan ini akan menghapus data merchant dan akun login owner secara permanen.` : ''} confirmLabel="Hapus"/>
+    </div>);
 }

@@ -1,38 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createMerchantSchema } from '@/lib/validations';
 import { isSupabaseAdminConfigured, supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getVerifiedAdmin } from '@/lib/serverAuth';
+import { consumeRateLimit } from '@/lib/serverRateLimit';
+import { logger, requestId } from '@/lib/logger';
 
-// Simple in-memory rate limiting map
-const ipRequestTimestamps: { [ip: string]: number } = {};
-
-export async function POST(req: Request) {
-  // Simple rate limiting: max 1 req per sec per IP
-  const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
-  const now = Date.now();
-  const lastReqTime = ipRequestTimestamps[ip];
-  if (lastReqTime && now - lastReqTime < 1000) {
-    return NextResponse.json({ error: 'Too many requests. Limit 1 per second.' }, { status: 429 });
-  }
-  ipRequestTimestamps[ip] = now;
-
+export async function POST(req: NextRequest) {
+  const correlationId = requestId(req.headers);
   try {
-    // 1. Auth Guard (check admin session in cookies)
-    const cookieHeader = req.headers.get('cookie') || '';
-    const sessionCookie = cookieHeader
-      .split('; ')
-      .find(row => row.startsWith('ecotour_session='))
-      ?.split('=')[1];
-    
-    let adminProfile: any = null;
-    if (sessionCookie) {
-      try {
-        adminProfile = JSON.parse(decodeURIComponent(sessionCookie));
-      } catch {
-        // ignore
-      }
-    }
-
-    if (!adminProfile || adminProfile.role !== 'admin') {
+    const adminProfile = await getVerifiedAdmin(req);
+    if (!adminProfile) {
       return NextResponse.json({ error: 'Unauthorized. Akses ditolak.' }, { status: 401 });
     }
 
@@ -44,6 +21,25 @@ export async function POST(req: Request) {
     }
 
     const { name, category, location, merchant_type, phone, owner_email, owner_password } = validation.data;
+
+    if (!isSupabaseAdminConfigured) {
+      return NextResponse.json(
+        { error: 'SUPABASE_SERVICE_ROLE_KEY belum dikonfigurasi' },
+        { status: 503 }
+      );
+    }
+    const rateLimit = await consumeRateLimit(req, {
+      namespace: 'admin:create-merchant',
+      subject: adminProfile.id,
+      limit: 5,
+      windowSeconds: 60,
+    });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: rateLimit.unavailable ? 'Rate limiter tidak tersedia' : 'Terlalu banyak permintaan' },
+        { status: rateLimit.unavailable ? 503 : 429 }
+      );
+    }
 
     // 3. Database operations
     if (isSupabaseAdminConfigured) {
@@ -121,17 +117,10 @@ export async function POST(req: Request) {
         merchant: merchantData,
         credentials: { email: owner_email, password: owner_password }
       });
-    } else {
-      // Simulation offline mode
-      return NextResponse.json({
-        success: true,
-        skipped: true,
-        reason: 'offline_mode_simulation',
-        credentials: { email: owner_email, password: owner_password }
-      });
     }
-  } catch (err: any) {
-    console.error('[create-merchant] caught error:', err);
-    return NextResponse.json({ error: 'Internal Server Error: ' + err.message }, { status: 500 });
+  } catch (err: unknown) {
+    logger.error('merchant.create.failed', { correlationId, error: err });
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: 'Internal Server Error: ' + message }, { status: 500 });
   }
 }

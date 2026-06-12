@@ -35,7 +35,7 @@ export const VISITOR_COLUMNS: CSVColumn[] = [
  * Prepends UTF-8 BOM to ensure compatibility with Microsoft Excel.
  */
 export function generateCSV(
-  data: any[],
+  data: object[],
   columns: CSVColumn[],
   filename: string
 ) {
@@ -45,7 +45,7 @@ export function generateCSV(
   // Create CSV body rows
   const rows = data.map(row => {
     return columns.map(col => {
-      const val = row[col.key];
+      const val = (row as Record<string, unknown>)[col.key];
       if (val === undefined || val === null) {
         return '""';
       }

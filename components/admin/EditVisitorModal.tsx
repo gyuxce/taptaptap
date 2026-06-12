@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -66,14 +66,7 @@ export const EditVisitorModal: React.FC<EditVisitorModalProps> = ({
     }
   }, [tag, isOpen]);
 
-  // Load history when RFID tab is selected
-  useEffect(() => {
-    if (isOpen && activeTab === 'rfid' && visitor) {
-      loadTopupHistory();
-    }
-  }, [isOpen, activeTab, visitor]);
-
-  const loadTopupHistory = async () => {
+  const loadTopupHistory = useCallback(async () => {
     if (!visitor) return;
     setHistoryLoading(true);
     try {
@@ -83,12 +76,19 @@ export const EditVisitorModal: React.FC<EditVisitorModalProps> = ({
       } else {
         setTopupHistory(res.topups || []);
       }
-    } catch (err) {
+    } catch {
       toast.error('Gagal memuat riwayat top up');
     } finally {
       setHistoryLoading(false);
     }
-  };
+  }, [visitor]);
+
+  // Load history when RFID tab is selected
+  useEffect(() => {
+    if (isOpen && activeTab === 'rfid' && visitor) {
+      void loadTopupHistory();
+    }
+  }, [isOpen, activeTab, visitor, loadTopupHistory]);
 
   // Format amount input on change (e.g. 50.000)
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,20 +119,9 @@ export const EditVisitorModal: React.FC<EditVisitorModalProps> = ({
 
   // Text field onBlur validations
   const validateField = (field: 'name' | 'phone') => {
-    let valueToValidate: any = '';
-    let validator: any = null;
-
-    if (field === 'name') {
-      valueToValidate = name;
-      validator = registerVisitorSchema.shape.name;
-    } else if (field === 'phone') {
-      valueToValidate = phone;
-      validator = registerVisitorSchema.shape.phone;
-    }
-
-    if (!validator) return;
-
-    const res = validator.safeParse(valueToValidate);
+    const res = field === 'name'
+      ? registerVisitorSchema.shape.name.safeParse(name)
+      : registerVisitorSchema.shape.phone.safeParse(phone);
     if (!res.success) {
       setErrors(prev => ({ ...prev, [field]: res.error.issues[0].message }));
     } else {
@@ -179,7 +168,7 @@ export const EditVisitorModal: React.FC<EditVisitorModalProps> = ({
         onSuccess();
         onClose();
       }
-    } catch (err) {
+    } catch {
       toast.error('Terjadi kesalahan saat menyimpan data');
     } finally {
       setSaveLoading(false);
@@ -200,7 +189,7 @@ export const EditVisitorModal: React.FC<EditVisitorModalProps> = ({
         toast.success(`Gelang RFID berhasil ${targetStatus ? 'diaktifkan' : 'dinonaktifkan'}`);
         onSuccess();
       }
-    } catch (err) {
+    } catch {
       toast.error('Gagal memperbarui status RFID');
     } finally {
       setToggleLoading(false);

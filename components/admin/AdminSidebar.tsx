@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut, useAuth } from '@/lib/auth';
-import { LayoutDashboard, Users, Store, History, LogOut, Compass, FileBarChart } from 'lucide-react';
+import { LayoutDashboard, Users, Store, History, LogOut, FileBarChart } from 'lucide-react';
 import { WavrLogo } from '@/components/ui/WavrLogo';
 
 interface SidebarProps {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -32,16 +32,7 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
   const [history, setHistory] = useState<CreditTopUp[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      setAmountStr('');
-      setNote('');
-      setErrors({});
-      loadRecentTopups();
-    }
-  }, [isOpen, visitor]);
-
-  const loadRecentTopups = async () => {
+  const loadRecentTopups = useCallback(async () => {
     if (!visitor) return;
     setHistoryLoading(true);
     try {
@@ -54,7 +45,16 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
     } finally {
       setHistoryLoading(false);
     }
-  };
+  }, [visitor]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setAmountStr('');
+      setNote('');
+      setErrors({});
+      void loadRecentTopups();
+    }
+  }, [isOpen, loadRecentTopups]);
 
   const handleAmountChange = (val: string) => {
     const rawVal = val.replace(/\D/g, '');
@@ -118,7 +118,7 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
       } else {
         toast.error(res.error || 'Gagal melakukan top up');
       }
-    } catch (err) {
+    } catch {
       toast.error('Terjadi kesalahan pada sistem');
     } finally {
       setLoading(false);

@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { db } from '@/lib/supabase';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Transaction, Merchant } from '@/types';
 import { formatRupiah, formatDatetime } from '@/lib/utils';
-import { fetchTransactions } from '@/lib/services/transactionService';
+import { fetchTransactions, TransactionFilters } from '@/lib/services/transactionService';
 import { getAllMerchants } from '@/lib/services/merchantService';
 
 import { Badge } from '@/components/ui/Badge';
@@ -34,27 +33,23 @@ export default function AdminTransactionsPage() {
     loadInitData();
   }, []);
 
-  useEffect(() => {
-    loadTransactionData();
-  }, [merchantFilter, typeFilter, dateFrom, dateTo, currentPage]);
-
   const loadInitData = async () => {
     setLoading(true);
     try {
       const mList = await getAllMerchants();
       setMerchants(mList);
-    } catch (err) {
+    } catch {
       toast.error('Gagal memuat filter merchant');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadTransactionData = async (isSilent = false) => {
+  const loadTransactionData = useCallback(async (isSilent = false) => {
     if (!isSilent) setFetchingList(true);
     
     try {
-      const filters: any = {
+      const filters: TransactionFilters = {
         limit: itemsPerPage,
         offset: (currentPage - 1) * itemsPerPage,
       };
@@ -74,12 +69,16 @@ export default function AdminTransactionsPage() {
       const res = await fetchTransactions(merchantFilter, filters);
       setTransactions(res.transactions);
       setTotalCount(res.total);
-    } catch (err) {
+    } catch {
       toast.error('Gagal mengambil daftar transaksi');
     } finally {
       setFetchingList(false);
     }
-  };
+  }, [currentPage, dateFrom, dateTo, merchantFilter, typeFilter]);
+
+  useEffect(() => {
+    void loadTransactionData();
+  }, [loadTransactionData]);
 
   // Summary Metrics calculations (Calculated across currently filtered local list page)
   const summaryMetrics = useMemo(() => {
@@ -219,7 +218,7 @@ export default function AdminTransactionsPage() {
           <select
             value={typeFilter}
             onChange={(e) => {
-              setTypeFilter(e.target.value as any);
+              setTypeFilter(e.target.value as typeof typeFilter);
               setCurrentPage(1);
             }}
             className="w-full px-3.5 py-2.5 text-xs bg-[#f7f7f5] text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]"
@@ -293,7 +292,7 @@ export default function AdminTransactionsPage() {
                     <td className="py-3 px-4 font-medium text-gray-500">{formatDatetime(tx.created_at)}</td>
                     <td className="py-3 px-2 font-bold text-[#1e293b]">{tx.visitor_name}</td>
                     <td className="py-3 px-2">
-                      <Badge variant={tx.ticket_type as any}>{tx.ticket_type}</Badge>
+                      <Badge variant={tx.ticket_type as 'Regular' | 'VIP' | 'Family' | 'Group'}>{tx.ticket_type}</Badge>
                     </td>
                     <td className="py-3 px-2 text-[#64748b] font-semibold">{tx.merchant_name}</td>
                     <td className="py-3 px-2">

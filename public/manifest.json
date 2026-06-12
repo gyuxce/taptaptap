@@ -3,12 +3,13 @@
   "short_name": "WAVR",
   "description": "Sistem tap NFC untuk wisata & event",
   "start_url": "/tap",
+  "scope": "/",
+  "id": "/tap",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#29ABE2",
   "background_color": "#F8FAFF",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/logo-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }

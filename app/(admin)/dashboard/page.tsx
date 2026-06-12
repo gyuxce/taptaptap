@@ -6,8 +6,8 @@ import { Visitor, Merchant, Transaction } from '@/types';
 import { formatRupiah, formatDatetime, formatPhoneForWA } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard } from '@/components/ui/StatCard';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from 'recharts';
-import { Users, Store, CreditCard, Activity, TrendingUp, RefreshCw, AlertTriangle } from 'lucide-react';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from 'recharts';
+import { Users, Store, CreditCard, Activity, RefreshCw, AlertTriangle } from 'lucide-react';
 import { toast } from '@/components/ui/Toast';
 import { checkMerchantActivity, SilentMerchant } from '@/lib/services/alertService';
 import { RealtimeFeed, FeedItem } from '@/components/admin/RealtimeFeed';
@@ -76,7 +76,7 @@ export default function AdminDashboardPage() {
       const todayTxs = txs.filter(t => new Date(t.created_at).getTime() >= todayTimestamp);
       setLiveTapsCount(todayTxs.length);
       setLiveRevenue(todayTxs.filter(t => t.type === 'payment').reduce((sum, tx) => sum + tx.amount, 0));
-    } catch (err) {
+    } catch {
       toast.error('Gagal memuat statistik dashboard');
     } finally {
       setLoading(false);
@@ -124,14 +124,6 @@ export default function AdminDashboardPage() {
   const todayTxs = useMemo(() => {
     return transactions.filter(t => new Date(t.created_at).getTime() >= todayTimestamp);
   }, [transactions, todayTimestamp]);
-
-  const todayTapsCount = todayTxs.length;
-
-  const todayRevenue = useMemo(() => {
-    return todayTxs
-      .filter(t => t.type === 'payment')
-      .reduce((sum, tx) => sum + tx.amount, 0);
-  }, [todayTxs]);
 
   // Hourly Line Chart Data today
   const hourlyChartData = useMemo(() => {

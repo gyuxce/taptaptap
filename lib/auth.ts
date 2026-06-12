@@ -1,210 +1,152 @@
-import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from './supabase';
-import { Profile } from '@/types';
+import { useEffect, useState } from 'react';
+import type { Session, User } from '@supabase/supabase-js';
+import { supabase, requireSupabaseConfig } from './supabase';
+import type { Profile } from '@/types';
 import { loginSchema } from './validations';
 
-const SEED_ACCOUNTS = [
-  { email: 'admin@wavr.com', role: 'admin', merchant_id: null, merchant_type: null },
-  { email: 'zipline@wavr.com', role: 'merchant', merchant_id: 'm-lok1', merchant_type: 'loket' },
-  { email: 'cafe@wavr.com', role: 'merchant', merchant_id: 'm-fb1', merchant_type: 'regular' },
-];
+const AUTH_TIMEOUT_MS = 10000;
+type AuthUser = Pick<User, 'id' | 'email'>;
+
+function withTimeout<T>(promise: PromiseLike<T>, timeoutMs = AUTH_TIMEOUT_MS): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = window.setTimeout(
+      () => reject(new Error('Permintaan autentikasi terlalu lama')),
+      timeoutMs
+    );
+
+    promise.then(
+      value => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      },
+      error => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      }
+    );
+  });
+}
+
+async function fetchProfile(userId: string): Promise<Profile | null> {
+  const { data, error } = await withTimeout(
+    supabase.from('profiles').select('*').eq('id', userId).single()
+  );
+  return error || !data ? null : data as Profile;
+}
 
 export async function signIn(email: string, password: string) {
-  // Validate with Zod schema
   const validation = loginSchema.safeParse({ email, password });
   if (!validation.success) {
-    const errorMsg = validation.error.issues[0]?.message || 'Email atau password salah';
-    return { user: null, profile: null, error: errorMsg };
+    return {
+      user: null,
+      profile: null,
+      error: validation.error.issues[0]?.message || 'Email atau password salah',
+    };
   }
 
   try {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        return { user: null, profile: null, error: 'Email atau password salah' };
-      }
-
-      // Fetch profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
-
-      if (profileError || !profile) {
-        return { user: data.user, profile: null, error: 'Akun tidak terdaftar dalam sistem' };
-      }
-
-      // Write session cookie for Next.js Middleware route guards
-      if (typeof window !== 'undefined') {
-        document.cookie = `ecotour_session=${encodeURIComponent(JSON.stringify(profile))}; path=/; max-age=86400`;
-      }
-
-      return { user: data.user, profile, error: null };
-    } else {
-      // Simulation mode
-      const cleanEmail = email.toLowerCase().trim();
-      const matched = SEED_ACCOUNTS.find(acc => acc.email === cleanEmail);
-      
-      if (!matched) {
-        return { user: null, profile: null, error: 'Akun tidak terdaftar dalam sistem' };
-      }
-
-      if (password !== 'password123' && password !== 'password' && password !== 'demo1234') {
-        return { user: null, profile: null, error: 'Email atau password salah' };
-      }
-
-      const mockUser = {
-        id: matched.role === 'admin' 
-          ? 'u-admin' 
-          : (matched.merchant_id ? matched.merchant_id.replace('m-', 'u-') : 'u-merchant'),
-        email: matched.email,
-      };
-
-      const mockProfile: Profile = {
-        id: mockUser.id,
-        role: matched.role as 'admin' | 'merchant',
-        merchant_id: matched.merchant_id,
-        merchant_type: matched.merchant_type as 'loket' | 'regular' | null,
-        created_at: new Date().toISOString(),
-      };
-
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem('ecotour_session', JSON.stringify({ user: mockUser, profile: mockProfile }));
-        document.cookie = `ecotour_session=${encodeURIComponent(JSON.stringify(mockProfile))}; path=/; max-age=86400`;
-        
-        // Dispatch custom event to notify useAuth hooks active in other components
-        window.dispatchEvent(new Event('auth-change'));
-      }
-
-      return { user: mockUser, profile: mockProfile, error: null };
+    requireSupabaseConfig();
+    const { data, error } = await withTimeout(
+      supabase.auth.signInWithPassword({ email, password })
+    );
+    if (error) {
+      return { user: null, profile: null, error: 'Email atau password salah' };
     }
-  } catch {
-    return { user: null, profile: null, error: 'Terjadi kesalahan, coba lagi' };
+
+    const profile = await fetchProfile(data.user.id);
+    if (!profile) {
+      await supabase.auth.signOut();
+      return {
+        user: data.user,
+        profile: null,
+        error: 'Akun belum memiliki profil atau hak akses',
+      };
+    }
+
+    return { user: data.user, profile, error: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Terjadi kesalahan, coba lagi';
+    return { user: null, profile: null, error: message };
   }
 }
 
 export async function signOut() {
-  try {
-    if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
-      if (typeof window !== 'undefined') {
-        document.cookie = 'ecotour_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      }
-    } else {
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.removeItem('ecotour_session');
-        document.cookie = 'ecotour_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        window.dispatchEvent(new Event('auth-change'));
-      }
-    }
-  } catch {
-    // ignore
-  }
+  requireSupabaseConfig();
+  await supabase.auth.signOut();
 }
 
 export async function getSession() {
   try {
-    if (isSupabaseConfigured) {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error || !session) return null;
+    requireSupabaseConfig();
+    const { data: { session }, error } = await withTimeout(supabase.auth.getSession());
+    if (error || !session) return null;
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-
-      return { session, profile: profile || null };
-    } else {
-      if (typeof window !== 'undefined') {
-        const stored = window.sessionStorage.getItem('ecotour_session');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          return { session: { user: parsed.user }, profile: parsed.profile };
-        }
-      }
-      return null;
-    }
+    const profile = await fetchProfile(session.user.id);
+    return profile ? { session, profile } : null;
   } catch {
     return null;
   }
 }
 
 export function useAuth() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (isSupabaseConfigured) {
-      // Timeout failsafe: if loading after 12s, force redirect-able state
-      const timeoutId = setTimeout(() => {
-        console.warn('[useAuth] Auth timeout — forcing loading=false');
-        setLoading(false);
-      }, 12000);
+    let active = true;
+    let requestId = 0;
 
-      // Single source of truth: onAuthStateChange handles both initial + changes
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        try {
-          if (session?.user) {
-            setUser(session.user);
-            // Fetch profile with timeout guard
-            const { data: prof, error: profErr } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-            if (profErr) {
-              console.error('[useAuth] Profile fetch error:', profErr.message);
-              setProfile(null);
-            } else {
-              setProfile(prof);
-            }
-          } else {
+    const applySession = async (session: Session | null) => {
+      const currentRequest = ++requestId;
+      try {
+        if (!session?.user) {
+          if (active && currentRequest === requestId) {
             setUser(null);
             setProfile(null);
           }
-        } catch (err) {
-          console.error('[useAuth] Unexpected error:', err);
-          setUser(null);
-          setProfile(null);
-        } finally {
-          clearTimeout(timeoutId);
-          setLoading(false);
+          return;
         }
-      });
 
-      return () => {
-        clearTimeout(timeoutId);
-        subscription.unsubscribe();
-      };
-    } else {
-      // Simulation mode
-      const updateMockState = () => {
-        if (typeof window !== 'undefined') {
-          const stored = window.sessionStorage.getItem('ecotour_session');
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            setUser(parsed.user);
-            setProfile(parsed.profile);
-          } else {
-            setUser(null);
-            setProfile(null);
-          }
-        }
-        setLoading(false);
-      };
+        const nextProfile = await fetchProfile(session.user.id);
+        if (!active || currentRequest !== requestId) return;
 
-      updateMockState();
-
-      if (typeof window !== 'undefined') {
-        window.addEventListener('auth-change', updateMockState);
-        return () => {
-          window.removeEventListener('auth-change', updateMockState);
-        };
+        setUser(session.user);
+        setProfile(nextProfile);
+      } catch {
+        if (!active || currentRequest !== requestId) return;
+        setUser(null);
+        setProfile(null);
+      } finally {
+        if (active && currentRequest === requestId) setLoading(false);
       }
-    }
+    };
+
+    const initialize = async () => {
+      try {
+        requireSupabaseConfig();
+        const { data, error } = await withTimeout(supabase.auth.getSession());
+        if (error) throw error;
+        await applySession(data.session);
+      } catch {
+        if (!active) return;
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== 'INITIAL_SESSION') void applySession(session);
+    });
+
+    void initialize();
+
+    return () => {
+      active = false;
+      requestId += 1;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return { user, profile, loading, signOut };

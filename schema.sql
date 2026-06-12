@@ -73,6 +73,7 @@ CREATE TABLE merchants (
 -- =======================================================================
 CREATE TABLE transactions (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  idempotency_key UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
   rfid_uid TEXT NOT NULL,
   merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
   type TEXT NOT NULL CHECK (type IN ('entry', 'payment')),
@@ -95,20 +96,60 @@ CREATE TABLE audit_log (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE rate_limit_buckets (
+  key_hash TEXT PRIMARY KEY,
+  request_count INTEGER NOT NULL DEFAULT 0,
+  window_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- =======================================================================
 -- INDEXES (Penting untuk efisiensi kueri skala besar)
 -- =======================================================================
 CREATE INDEX idx_transactions_merchant_id ON transactions(merchant_id);
 CREATE INDEX idx_transactions_created_at ON transactions(created_at DESC);
 CREATE INDEX idx_transactions_rfid_uid ON transactions(rfid_uid);
+CREATE INDEX idx_transactions_rapid_tap ON transactions(merchant_id, rfid_uid, created_at DESC);
 CREATE INDEX idx_rfid_tags_uid ON rfid_tags(uid);
 CREATE INDEX idx_visitors_name ON visitors(name);
 CREATE INDEX idx_audit_log_actor ON audit_log(actor_user_id);
 CREATE INDEX idx_audit_log_merchant ON audit_log(merchant_id);
+CREATE INDEX idx_rate_limit_updated_at ON rate_limit_buckets(updated_at);
 
 -- =======================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- =======================================================================
+
+CREATE OR REPLACE FUNCTION public.current_app_role()
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$ SELECT role FROM profiles WHERE id = auth.uid() $$;
+
+CREATE OR REPLACE FUNCTION public.current_merchant_id()
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$ SELECT merchant_id FROM profiles WHERE id = auth.uid() $$;
+
+CREATE OR REPLACE FUNCTION public.current_merchant_type()
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$ SELECT merchant_type FROM profiles WHERE id = auth.uid() $$;
+
+REVOKE ALL ON FUNCTION public.current_app_role() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.current_merchant_id() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.current_merchant_type() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.current_app_role() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.current_merchant_id() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.current_merchant_type() TO authenticated;
 
 -- Profile Policies
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -123,7 +164,7 @@ CREATE POLICY "Allow update profile to owner"
 
 CREATE POLICY "Allow read profiles to admin" 
   ON profiles FOR SELECT TO authenticated 
-  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+  USING (current_app_role() = 'admin');
 
 -- Visitors Policies
 ALTER TABLE visitors ENABLE ROW LEVEL SECURITY;
@@ -135,21 +176,22 @@ CREATE POLICY "Authenticated users can read all visitors"
 CREATE POLICY "Loket merchant or admin can insert visitors" 
   ON visitors FOR INSERT TO authenticated 
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE id = auth.uid() 
-        AND (role = 'admin' OR (role = 'merchant' AND merchant_type = 'loket'))
-    )
+    current_app_role() = 'admin'
+    OR (current_app_role() = 'merchant' AND current_merchant_type() = 'loket')
   );
 
 CREATE POLICY "Admin or Loket merchant can update visitors" 
   ON visitors FOR UPDATE TO authenticated 
   USING (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE id = auth.uid() 
-        AND (role = 'admin' OR (role = 'merchant' AND merchant_type = 'loket'))
-    )
+    current_app_role() = 'admin'
+    OR (current_app_role() = 'merchant' AND current_merchant_type() = 'loket')
+  );
+
+CREATE POLICY "Admin or Loket merchant can delete visitors"
+  ON visitors FOR DELETE TO authenticated
+  USING (
+    current_app_role() = 'admin'
+    OR (current_app_role() = 'merchant' AND current_merchant_type() = 'loket')
   );
 
 -- RFID Tags Policies
@@ -162,11 +204,19 @@ CREATE POLICY "Authenticated users can read RFID Tags"
 CREATE POLICY "Loket merchant or admin can register RFID Tags" 
   ON rfid_tags FOR INSERT TO authenticated 
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE id = auth.uid() 
-        AND (role = 'admin' OR (role = 'merchant' AND merchant_type = 'loket'))
-    )
+    current_app_role() = 'admin'
+    OR (current_app_role() = 'merchant' AND current_merchant_type() = 'loket')
+  );
+
+CREATE POLICY "Loket merchant or admin can update RFID Tags"
+  ON rfid_tags FOR UPDATE TO authenticated
+  USING (
+    current_app_role() = 'admin'
+    OR (current_app_role() = 'merchant' AND current_merchant_type() = 'loket')
+  )
+  WITH CHECK (
+    current_app_role() = 'admin'
+    OR (current_app_role() = 'merchant' AND current_merchant_type() = 'loket')
   );
 
 -- Merchants Policies
@@ -178,8 +228,8 @@ CREATE POLICY "Authenticated users can read merchants"
 
 CREATE POLICY "Only Admin can write merchants" 
   ON merchants FOR ALL TO authenticated 
-  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'))
-  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+  USING (current_app_role() = 'admin')
+  WITH CHECK (current_app_role() = 'admin');
 
 -- Transactions Policies
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
@@ -187,33 +237,24 @@ ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admin can read all, Merchant can read their own transactions" 
   ON transactions FOR SELECT TO authenticated 
   USING (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE id = auth.uid() 
-        AND (role = 'admin' OR merchant_id = transactions.merchant_id)
-    )
+    current_app_role() = 'admin'
+    OR current_merchant_id() = transactions.merchant_id
   );
 
 CREATE POLICY "Merchant can log transaction matching their profile" 
   ON transactions FOR INSERT TO authenticated 
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE id = auth.uid() 
-        AND (role = 'admin' OR merchant_id = transactions.merchant_id)
-    )
+    current_app_role() = 'admin'
+    OR current_merchant_id() = transactions.merchant_id
   );
 
 -- Audit Log Policies
 ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rate_limit_buckets ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Only Admin can view audit logs" 
   ON audit_log FOR SELECT TO authenticated 
-  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
-
-CREATE POLICY "System triggers can insert audit logs" 
-  ON audit_log FOR INSERT TO authenticated 
-  WITH CHECK (true);
+  USING (current_app_role() = 'admin');
 
 -- =======================================================================
 -- AUTOMATED TRIGGERS & FUNCTIONS
@@ -251,7 +292,7 @@ BEGIN
   INSERT INTO audit_log (action, actor_user_id, merchant_id, target_id, metadata)
   VALUES (
     'tap',
-    (SELECT id::text FROM profiles WHERE merchant_id = NEW.merchant_id LIMIT 1),
+    auth.uid()::text,
     NEW.merchant_id,
     NEW.id,
     jsonb_build_object(
@@ -268,6 +309,49 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER trg_after_transaction_insert
   AFTER INSERT ON transactions
   FOR EACH ROW EXECUTE FUNCTION trg_fn_after_transaction_insert();
+
+CREATE OR REPLACE FUNCTION trg_fn_audit_visitor_update()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO audit_log (action, actor_user_id, target_id, metadata)
+  VALUES (
+    'update_visitor',
+    auth.uid()::text,
+    NEW.id,
+    jsonb_build_object(
+      'before', to_jsonb(OLD) - 'photo_url',
+      'after', to_jsonb(NEW) - 'photo_url'
+    )
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE TRIGGER trg_audit_visitor_update
+  AFTER UPDATE ON visitors
+  FOR EACH ROW
+  WHEN (OLD.* IS DISTINCT FROM NEW.*)
+  EXECUTE FUNCTION trg_fn_audit_visitor_update();
+
+CREATE OR REPLACE FUNCTION trg_fn_audit_tag_update()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO audit_log (action, actor_user_id, target_id, metadata)
+  VALUES (
+    'toggle_tag',
+    auth.uid()::text,
+    NEW.id,
+    jsonb_build_object('uid', NEW.uid, 'is_active_before', OLD.is_active, 'is_active_after', NEW.is_active)
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE TRIGGER trg_audit_tag_update
+  AFTER UPDATE OF is_active ON rfid_tags
+  FOR EACH ROW
+  WHEN (OLD.is_active IS DISTINCT FROM NEW.is_active)
+  EXECUTE FUNCTION trg_fn_audit_tag_update();
 
 
 -- Trigger 3: Otomatis sinkronisasi auth.users ke public.profiles saat signup baru
@@ -288,39 +372,6 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- =======================================================================
--- SEED DATA
--- =======================================================================
-
--- Seed Merchants
-INSERT INTO merchants (id, name, category, location, merchant_type, is_active) VALUES
-('m-lok1', 'Loket Utama Barat (Entry)', 'Loket/Gerbang', 'Gerbang Barat Area A', 'loket', true),
-('m-adv1', 'Zipline Canopy Canopy', 'Adventure', 'Lembah Pinus Area B', 'regular', true),
-('m-fb1', 'Warung Kopi Pinus', 'F&B', 'Puncak Pinus Area B', 'regular', true),
-('m-ret1', 'EcoCraft Souvenir & Kaos', 'Retail', 'Plaza Belanja Utama', 'regular', true);
-
--- Seed Visitors
-INSERT INTO visitors (id, name, phone, ticket_type, credit_limit, credit_used) VALUES
-('v-1', 'Ahmad Faisal', '081234567890', 'VIP', 500000, 110000),
-('v-2', 'Siti Rahmawati', '082345678901', 'Regular', 150000, 80000),
-('v-3', 'Dewi Lestari', '083456789012', 'Family', 800000, 0),
-('v-4', 'Budi Hartono', '084567890123', 'Group', 0, 120000);
-
--- Seed RFID Tags mapping
-INSERT INTO rfid_tags (id, uid, visitor_id, is_active, registered_by) VALUES
-('tag-1', 'E280113C200078AC', 'v-1', true, 'm-lok1'),
-('tag-2', 'E280113C200078AD', 'v-2', true, 'm-lok1'),
-('tag-3', 'E280113C200078AE', 'v-3', true, 'm-lok1'),
-('tag-4', 'E280113C200078AF', 'v-4', true, 'm-lok1');
-
--- Seed Admin Profile (COMMENTS ONLY TO PREVENT FK ERROR)
--- Catatan: Supabase melarang data dimasukkan ke profiles sebelum user di auth.users dibuat.
--- Setelah melakukan registrasi/sign up admin baru di auth dashboard, jalankan query berikut:
---
--- INSERT INTO public.profiles (id, role, merchant_id, merchant_type)
--- VALUES ('UUID_USER_AUTH_ANDA', 'admin', null, null);
-
 
 -- =======================================================================
 -- 7. CREDIT TOPUPS (Top up history)
@@ -346,19 +397,291 @@ ALTER TABLE credit_topups ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admin can read all, Merchant can read their own topups" 
   ON credit_topups FOR SELECT TO authenticated 
   USING (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE id = auth.uid() 
-        AND (role = 'admin' OR merchant_id = credit_topups.top_up_by)
-    )
+    current_app_role() = 'admin'
+    OR current_merchant_id() = credit_topups.top_up_by
   );
 
 CREATE POLICY "Admin or Merchant can log topup matching their profile" 
   ON credit_topups FOR INSERT TO authenticated 
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE id = auth.uid() 
-        AND (role = 'admin' OR merchant_id = credit_topups.top_up_by)
+    current_app_role() = 'admin'
+    OR current_merchant_id() = credit_topups.top_up_by
+  );
+
+-- =======================================================================
+-- ATOMIC MONEY OPERATIONS
+-- All balance changes and their ledger rows are committed together.
+-- =======================================================================
+
+CREATE OR REPLACE FUNCTION public.process_tap(
+  p_rfid_uid TEXT,
+  p_merchant_id TEXT,
+  p_type TEXT,
+  p_amount NUMERIC,
+  p_idempotency_key UUID,
+  p_allow_rapid_repeat BOOLEAN DEFAULT FALSE
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_profile profiles%ROWTYPE;
+  v_merchant merchants%ROWTYPE;
+  v_tag rfid_tags%ROWTYPE;
+  v_visitor visitors%ROWTYPE;
+  v_transaction transactions%ROWTYPE;
+  v_existing transactions%ROWTYPE;
+  v_whatsapp_status TEXT;
+BEGIN
+  IF p_type NOT IN ('entry', 'payment') OR p_amount < 0 THEN
+    RAISE EXCEPTION 'INVALID_TRANSACTION';
+  END IF;
+
+  SELECT * INTO v_profile FROM profiles WHERE id = auth.uid();
+  IF NOT FOUND OR (
+    v_profile.role <> 'admin'
+    AND (v_profile.role <> 'merchant' OR v_profile.merchant_id <> p_merchant_id)
+  ) THEN
+    RAISE EXCEPTION 'FORBIDDEN';
+  END IF;
+
+  SELECT * INTO v_merchant FROM merchants
+  WHERE id = p_merchant_id AND is_active = TRUE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'MERCHANT_INACTIVE';
+  END IF;
+
+  IF (v_merchant.merchant_type = 'loket' AND (p_type <> 'entry' OR p_amount <> 0))
+    OR (v_merchant.merchant_type = 'regular' AND (p_type <> 'payment' OR p_amount <= 0)) THEN
+    RAISE EXCEPTION 'INVALID_MERCHANT_TRANSACTION';
+  END IF;
+
+  SELECT * INTO v_existing FROM transactions
+  WHERE idempotency_key = p_idempotency_key;
+  IF FOUND THEN
+    RETURN jsonb_build_object(
+      'transaction', to_jsonb(v_existing),
+      'duplicate', TRUE
+    );
+  END IF;
+
+  SELECT t.* INTO v_tag
+  FROM rfid_tags t
+  WHERE t.uid = upper(regexp_replace(p_rfid_uid, '[^0-9A-Fa-f]', '', 'g'))
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'TAG_NOT_FOUND';
+  END IF;
+  IF NOT v_tag.is_active THEN
+    RAISE EXCEPTION 'TAG_INACTIVE';
+  END IF;
+
+  SELECT * INTO v_visitor FROM visitors
+  WHERE id = v_tag.visitor_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'VISITOR_NOT_FOUND';
+  END IF;
+
+  IF NOT p_allow_rapid_repeat AND EXISTS (
+    SELECT 1 FROM transactions
+    WHERE merchant_id = p_merchant_id
+      AND rfid_uid = v_tag.uid
+      AND created_at >= NOW() - INTERVAL '3 seconds'
+  ) THEN
+    RAISE EXCEPTION 'DOUBLE_TAP';
+  END IF;
+
+  IF p_amount > 0
+    AND v_visitor.credit_limit > 0
+    AND v_visitor.credit_used + p_amount > v_visitor.credit_limit THEN
+    RAISE EXCEPTION 'INSUFFICIENT_CREDIT';
+  END IF;
+
+  IF p_amount > 0 THEN
+    UPDATE visitors
+    SET credit_used = credit_used + p_amount
+    WHERE id = v_visitor.id
+    RETURNING * INTO v_visitor;
+  END IF;
+
+  v_whatsapp_status := CASE
+    WHEN p_amount > 0 AND v_visitor.phone IS NOT NULL THEN 'pending'
+    ELSE 'not_applicable'
+  END;
+
+  INSERT INTO transactions (
+    idempotency_key,
+    rfid_uid,
+    merchant_id,
+    type,
+    amount,
+    whatsapp_status
+  )
+  VALUES (
+    p_idempotency_key,
+    v_tag.uid,
+    p_merchant_id,
+    p_type,
+    p_amount,
+    v_whatsapp_status
+  )
+  RETURNING * INTO v_transaction;
+
+  RETURN jsonb_build_object(
+    'transaction', to_jsonb(v_transaction),
+    'duplicate', FALSE,
+    'visitor', jsonb_build_object(
+      'id', v_visitor.id,
+      'name', v_visitor.name,
+      'phone', v_visitor.phone,
+      'credit_limit', v_visitor.credit_limit,
+      'credit_used', v_visitor.credit_used
     )
   );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.process_topup(
+  p_rfid_uid TEXT,
+  p_amount NUMERIC,
+  p_merchant_id TEXT,
+  p_note TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_profile profiles%ROWTYPE;
+  v_tag rfid_tags%ROWTYPE;
+  v_visitor visitors%ROWTYPE;
+  v_topup credit_topups%ROWTYPE;
+BEGIN
+  IF p_amount <= 0 OR p_amount > 5000000 THEN
+    RAISE EXCEPTION 'INVALID_TOPUP_AMOUNT';
+  END IF;
+
+  SELECT * INTO v_profile FROM profiles WHERE id = auth.uid();
+  IF NOT FOUND OR (
+    v_profile.role <> 'admin'
+    AND (
+      v_profile.role <> 'merchant'
+      OR v_profile.merchant_type <> 'loket'
+      OR v_profile.merchant_id <> p_merchant_id
+    )
+  ) THEN
+    RAISE EXCEPTION 'FORBIDDEN';
+  END IF;
+
+  SELECT * INTO v_tag FROM rfid_tags
+  WHERE uid = upper(regexp_replace(p_rfid_uid, '[^0-9A-Fa-f]', '', 'g'))
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'TAG_NOT_FOUND';
+  END IF;
+  IF NOT v_tag.is_active THEN
+    RAISE EXCEPTION 'TAG_INACTIVE';
+  END IF;
+
+  UPDATE visitors
+  SET credit_limit = credit_limit + p_amount
+  WHERE id = v_tag.visitor_id
+  RETURNING * INTO v_visitor;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'VISITOR_NOT_FOUND';
+  END IF;
+
+  INSERT INTO credit_topups (
+    visitor_id,
+    rfid_uid,
+    amount,
+    top_up_by,
+    top_up_by_name,
+    note
+  )
+  VALUES (
+    v_visitor.id,
+    v_tag.uid,
+    p_amount,
+    p_merchant_id,
+    CASE WHEN v_profile.role = 'admin' THEN 'Administrator' ELSE 'Merchant' END,
+    NULLIF(trim(p_note), '')
+  )
+  RETURNING * INTO v_topup;
+
+  INSERT INTO audit_log (action, actor_user_id, merchant_id, target_id, metadata)
+  VALUES (
+    'topup_credit',
+    auth.uid()::text,
+    p_merchant_id,
+    v_visitor.id,
+    jsonb_build_object(
+      'topup_id', v_topup.id,
+      'amount', p_amount,
+      'rfid_uid', v_tag.uid,
+      'note', NULLIF(trim(p_note), '')
+    )
+  );
+
+  RETURN jsonb_build_object(
+    'topup', to_jsonb(v_topup),
+    'new_credit_limit', v_visitor.credit_limit
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.process_tap(TEXT, TEXT, TEXT, NUMERIC, UUID, BOOLEAN) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.process_topup(TEXT, NUMERIC, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.process_tap(TEXT, TEXT, TEXT, NUMERIC, UUID, BOOLEAN) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.process_topup(TEXT, NUMERIC, TEXT, TEXT) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.consume_rate_limit(
+  p_key_hash TEXT,
+  p_limit INTEGER,
+  p_window_seconds INTEGER
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_bucket rate_limit_buckets%ROWTYPE;
+BEGIN
+  IF p_limit <= 0 OR p_window_seconds <= 0 OR length(p_key_hash) < 16 THEN
+    RAISE EXCEPTION 'INVALID_RATE_LIMIT';
+  END IF;
+
+  INSERT INTO rate_limit_buckets (key_hash, request_count)
+  VALUES (p_key_hash, 0)
+  ON CONFLICT (key_hash) DO NOTHING;
+
+  SELECT * INTO v_bucket
+  FROM rate_limit_buckets
+  WHERE key_hash = p_key_hash
+  FOR UPDATE;
+
+  IF v_bucket.window_started_at <= NOW() - make_interval(secs => p_window_seconds) THEN
+    UPDATE rate_limit_buckets
+    SET request_count = 1, window_started_at = NOW(), updated_at = NOW()
+    WHERE key_hash = p_key_hash;
+    RETURN TRUE;
+  END IF;
+
+  IF v_bucket.request_count >= p_limit THEN
+    RETURN FALSE;
+  END IF;
+
+  UPDATE rate_limit_buckets
+  SET request_count = request_count + 1, updated_at = NOW()
+  WHERE key_hash = p_key_hash;
+  RETURN TRUE;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.consume_rate_limit(TEXT, INTEGER, INTEGER) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.consume_rate_limit(TEXT, INTEGER, INTEGER) TO service_role;
