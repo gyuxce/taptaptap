@@ -779,6 +779,10 @@ export default function MerchantTerminalPage() {
     });
   }, [historyTxs]);
 
+  const hasNoChartRevenue = useMemo(() => {
+    return chartData.every(item => item.revenue === 0);
+  }, [chartData]);
+
   if (authLoading || terminalLoading) {
     return (
       <div className="min-h-screen bg-[#f7f7f5] flex items-center justify-center flex-col gap-3">
@@ -2026,7 +2030,12 @@ export default function MerchantTerminalPage() {
                     <BarChart data={chartData} margin={{ left: -25, right: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e3db" />
                       <XAxis dataKey="date" fontSize={9} stroke="#64748b" />
-                      <YAxis fontSize={9} stroke="#64748b" tickFormatter={(v) => `Rp${v/1000}k`} />
+                      <YAxis 
+                        fontSize={9} 
+                        stroke="#64748b" 
+                        domain={hasNoChartRevenue ? [0, 10000] : [0, 'auto']} 
+                        tickFormatter={(v) => v === 0 ? 'Rp0' : v % 1000 === 0 ? `Rp${v/1000}k` : `Rp${(v/1000).toFixed(1)}k`} 
+                      />
                       <Tooltip formatter={(v) => formatRupiah(Number(v))} contentStyle={{ fontSize: 10, borderRadius: 8 }} />
                       <Bar dataKey="revenue" fill="#1D9E75" radius={[4, 4, 0, 0]} />
                     </BarChart>

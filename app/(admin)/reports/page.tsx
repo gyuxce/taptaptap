@@ -286,6 +286,15 @@ export default function ReportsPage() {
     return Object.keys(chartData[0]).filter(k => k !== 'date');
   }, [chartData]);
 
+  const hasNoChartRevenue = useMemo(() => {
+    return chartData.every(item => {
+      return Object.entries(item).every(([key, val]) => {
+        if (key === 'date') return true;
+        return typeof val === 'number' ? val === 0 : true;
+      });
+    });
+  }, [chartData]);
+
   // Dropdown merchant toggle logic
   const handleSelectMerchant = (id: string) => {
     setSelectedMerchantIds(prev => {
@@ -552,13 +561,14 @@ export default function ReportsPage() {
                   fontWeight="bold"
                   tickLine={false} 
                 />
-                <YAxis 
-                  stroke="#94a3b8" 
-                  fontSize={10} 
-                  fontWeight="bold"
-                  tickLine={false} 
-                  tickFormatter={(val) => `Rp ${val / 1000}k`}
-                />
+                 <YAxis 
+                   stroke="#94a3b8" 
+                   fontSize={10} 
+                   fontWeight="bold"
+                   tickLine={false} 
+                   domain={hasNoChartRevenue ? [0, 10000] : [0, 'auto']}
+                   tickFormatter={(val) => val === 0 ? 'Rp 0' : val % 1000 === 0 ? `Rp ${val / 1000}k` : `Rp ${(val / 1000).toFixed(1)}k`}
+                 />
                 <Tooltip 
                   formatter={(value) => [formatRupiah(Number(value)), '']}
                   labelStyle={{ fontWeight: 'black', color: '#1e293b', fontSize: '11px' }}

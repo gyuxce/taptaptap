@@ -192,6 +192,11 @@ export default function AdminDashboardPage() {
     });
   }, [transactions]);
 
+  const hasNoWeeklyRevenue = useMemo(() => {
+    return weeklyRevenueChartData.every(item => item.revenue === 0);
+  }, [weeklyRevenueChartData]);
+
+
   if (loading) {
     return (
       <div className="flex flex-col gap-6 w-full animate-pulse">
@@ -341,7 +346,12 @@ export default function AdminDashboardPage() {
                 <BarChart data={weeklyRevenueChartData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e3db" />
                   <XAxis dataKey="date" fontSize={10} stroke="#64748b" />
-                  <YAxis fontSize={10} stroke="#64748b" tickFormatter={(v) => `Rp${v/1000}k`} />
+                  <YAxis 
+                    fontSize={10} 
+                    stroke="#64748b" 
+                    domain={hasNoWeeklyRevenue ? [0, 10000] : [0, 'auto']} 
+                    tickFormatter={(v) => v === 0 ? 'Rp0' : v % 1000 === 0 ? `Rp${v/1000}k` : `Rp${(v/1000).toFixed(1)}k`} 
+                  />
                   <Tooltip formatter={(v) => formatRupiah(Number(v))} contentStyle={{ fontSize: 11, borderRadius: 12 }} />
                   <Bar dataKey="revenue" fill="#1D9E75" radius={[4, 4, 0, 0]} />
                 </BarChart>

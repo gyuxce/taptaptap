@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut, useAuth } from '@/lib/auth';
-import { LayoutDashboard, Users, Store, History, LogOut, Leaf, FileBarChart } from 'lucide-react';
+import { LayoutDashboard, Users, Store, History, LogOut, Compass, FileBarChart } from 'lucide-react';
 
 interface SidebarProps {
   className?: string;
@@ -37,7 +37,7 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ className, onCloseMobile 
         {/* Header */}
         <div className="p-6 border-b border-slate-800 flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-[#1D9E75] flex items-center justify-center text-white shadow-md shadow-[#1D9E75]/25">
-            <Leaf className="h-5 w-5" />
+            <Compass className="h-5 w-5" />
           </div>
           <div className="text-left">
             <span className="font-extrabold text-sm tracking-tight text-white block">

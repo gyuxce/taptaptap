@@ -84,15 +84,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Gagal mendaftarkan merchant di database' }, { status: 500 });
       }
 
-      // Step C: Insert into profiles table
+      // Step C: Upsert into profiles table to prevent primary key collision from the trigger
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
-        .insert({
+        .upsert({
           id: userId,
           role: 'merchant',
           merchant_id: merchantData.id,
           merchant_type: merchant_type
-        });
+        }, { onConflict: 'id' });
 
       if (profileError) {
         console.error('[create-merchant] profile db error:', profileError);
