@@ -138,45 +138,45 @@ export function useAuth() {
 
   useEffect(() => {
     if (isSupabaseConfigured) {
-      // Fetch initial session
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          setUser(session.user);
-          supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-            .then(({ data: prof }) => {
+      // Timeout failsafe: if loading after 12s, force redirect-able state
+      const timeoutId = setTimeout(() => {
+        console.warn('[useAuth] Auth timeout — forcing loading=false');
+        setLoading(false);
+      }, 12000);
+
+      // Single source of truth: onAuthStateChange handles both initial + changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        try {
+          if (session?.user) {
+            setUser(session.user);
+            // Fetch profile with timeout guard
+            const { data: prof, error: profErr } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            if (profErr) {
+              console.error('[useAuth] Profile fetch error:', profErr.message);
+              setProfile(null);
+            } else {
               setProfile(prof);
-              setLoading(false);
-            });
-        } else {
+            }
+          } else {
+            setUser(null);
+            setProfile(null);
+          }
+        } catch (err) {
+          console.error('[useAuth] Unexpected error:', err);
           setUser(null);
           setProfile(null);
+        } finally {
+          clearTimeout(timeoutId);
           setLoading(false);
         }
       });
 
-      // Listen to Auth State Changes
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        setLoading(true);
-        if (session) {
-          setUser(session.user);
-          const { data: prof } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          setProfile(prof);
-        } else {
-          setUser(null);
-          setProfile(null);
-        }
-        setLoading(false);
-      });
-
       return () => {
+        clearTimeout(timeoutId);
         subscription.unsubscribe();
       };
     } else {
