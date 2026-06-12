@@ -7,6 +7,7 @@ import { db, isSupabaseConfigured } from '@/lib/supabase';
 import { Merchant } from '@/types';
 import { createMerchantSchema, CreateMerchantInput } from '@/lib/validations';
 import { toggleMerchantStatus } from '@/lib/services/merchantService';
+import { formatPhoneForWA, formatDatetime } from '@/lib/utils';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -14,7 +15,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Toaster, toast } from '@/components/ui/Toast';
-import { Plus, ToggleLeft, Store, MapPin, Eye, EyeOff, ShieldAlert, Key } from 'lucide-react';
+import { Plus, ToggleLeft, Store, MapPin, Eye, EyeOff, ShieldAlert, Key, Phone, Calendar } from 'lucide-react';
 
 export default function AdminMerchantsPage() {
   const [merchants, setMerchants] = useState<Merchant[]>([]);
@@ -38,6 +39,9 @@ export default function AdminMerchantsPage() {
     pass: string;
     name: string;
   } | null>(null);
+
+  // Detail modal state
+  const [selectedMerchantDetail, setSelectedMerchantDetail] = useState<Merchant | null>(null);
 
   // Form setup for create merchant
   const {
@@ -215,7 +219,7 @@ export default function AdminMerchantsPage() {
                 <th className="py-4 px-2">Kategori</th>
                 <th className="py-4 px-2">Lokasi Kios</th>
                 <th className="py-4 px-2">Tipe Terminal</th>
-                <th className="py-4 px-2">Owner User</th>
+                <th className="py-4 px-2">WhatsApp Owner</th>
                 <th className="py-4 px-2 text-center">Status</th>
                 <th className="py-4 px-4 text-right">Aksi</th>
               </tr>
@@ -223,7 +227,10 @@ export default function AdminMerchantsPage() {
             <tbody>
               {merchants.map((m) => (
                 <tr key={m.id} className="border-b border-[#f7f7f5] hover:bg-[#f7f7f5]/30 transition-colors">
-                  <td className="py-3 px-4 font-bold text-[#1e293b] flex items-center gap-2">
+                  <td 
+                    onClick={() => setSelectedMerchantDetail(m)}
+                    className="py-3 px-4 font-bold text-[#1e293b] flex items-center gap-2 cursor-pointer hover:text-[#1D9E75] transition-colors"
+                  >
                     <Store className="h-4 w-4 text-[#1D9E75]" /> {m.name}
                   </td>
                   <td className="py-3 px-2 text-gray-500 font-semibold">{m.category}</td>
@@ -235,15 +242,35 @@ export default function AdminMerchantsPage() {
                       {m.merchant_type === 'loket' ? 'Loket Entry' : 'Regular'}
                     </Badge>
                   </td>
-                  <td className="py-3 px-2 font-mono font-bold text-slate-500 truncate max-w-[150px]">
-                    {m.owner_user_id || '-'}
+                  <td className="py-3 px-2 font-medium text-slate-600">
+                    {m.phone ? (
+                      <a
+                        href={`https://wa.me/${formatPhoneForWA(m.phone)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 hover:text-[#1D9E75] hover:underline"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        {m.phone}
+                      </a>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
                   <td className="py-3 px-2 text-center">
                     <Badge variant={m.is_active ? 'success' : 'error'}>
                       {m.is_active ? 'Aktif' : 'Nonaktif'}
                     </Badge>
                   </td>
-                  <td className="py-3 px-4 text-right">
+                  <td className="py-3 px-4 text-right flex items-center justify-end gap-1.5">
+                    <Button
+                      onClick={() => setSelectedMerchantDetail(m)}
+                      variant="ghost"
+                      size="sm"
+                      className="text-[#1D9E75] hover:bg-[#E1F5EE] border border-[#1D9E75]/20 font-bold px-2.5 py-1 rounded-xl"
+                    >
+                      Detail
+                    </Button>
                     <Button
                       onClick={() => handleToggleClick(m)}
                       disabled={updatingId === m.id}
@@ -442,6 +469,89 @@ export default function AdminMerchantsPage() {
             >
               Saya Mengerti & Sudah Mencatat
             </Button>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal 3: Merchant Details View */}
+      <Modal
+        isOpen={selectedMerchantDetail !== null}
+        onClose={() => setSelectedMerchantDetail(null)}
+        title="Detail Informasi Merchant"
+      >
+        {selectedMerchantDetail && (
+          <div className="flex flex-col gap-4 text-left text-xs font-bold text-slate-700">
+            <div className="flex items-center gap-3 p-4 bg-slate-50 border border-[#e5e3db] rounded-2xl">
+              <div className="w-12 h-12 rounded-xl bg-[#E1F5EE] flex items-center justify-center text-[#1D9E75]">
+                <Store className="h-6 w-6" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-[#1e293b]">{selectedMerchantDetail.name}</h4>
+                <p className="text-[10px] text-slate-400 mt-0.5">ID: {selectedMerchantDetail.id}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400">Kategori Kios</span>
+                <span className="text-slate-800 font-black text-[#1e293b]">{selectedMerchantDetail.category}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400">Tipe Terminal</span>
+                <Badge variant={selectedMerchantDetail.merchant_type === 'loket' ? 'VIP' : 'Family'} className="w-fit mt-0.5">
+                  {selectedMerchantDetail.merchant_type === 'loket' ? 'Loket Entry' : 'Regular'}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-wider text-slate-400">Lokasi Pos Kios</span>
+              <span className="text-slate-800 flex items-center gap-1 mt-0.5 font-black text-[#1e293b]">
+                <MapPin className="h-3.5 w-3.5 text-slate-400" /> {selectedMerchantDetail.location}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-wider text-slate-400">Nomor WhatsApp Owner</span>
+              {selectedMerchantDetail.phone ? (
+                <a
+                  href={`https://wa.me/${formatPhoneForWA(selectedMerchantDetail.phone)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#1D9E75] hover:underline flex items-center gap-1 mt-0.5"
+                >
+                  <Phone className="h-3.5 w-3.5 text-[#1D9E75]" /> {selectedMerchantDetail.phone} (Hubungi)
+                </a>
+              ) : (
+                <span className="text-slate-400 font-medium">-</span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-wider text-slate-400">Owner User ID</span>
+              <span className="text-slate-500 font-mono select-all break-all">{selectedMerchantDetail.owner_user_id || '-'}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-3.5 mt-1">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400">Status Akun</span>
+                <Badge variant={selectedMerchantDetail.is_active ? 'success' : 'error'} className="w-fit mt-0.5">
+                  {selectedMerchantDetail.is_active ? 'Aktif' : 'Nonaktif'}
+                </Badge>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400">Terdaftar Pada</span>
+                <span className="text-slate-650 flex items-center gap-1 mt-0.5 text-[#1e293b]">
+                  <Calendar className="h-3.5 w-3.5 text-slate-400" /> {formatDatetime(selectedMerchantDetail.created_at)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-2">
+              <Button onClick={() => setSelectedMerchantDetail(null)} variant="ghost" size="sm" className="font-bold border border-slate-200">
+                Tutup Detail
+              </Button>
+            </div>
           </div>
         )}
       </Modal>
