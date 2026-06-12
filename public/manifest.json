@@ -1,0 +1,14 @@
+{
+  "name": "EcoTour Tap System",
+  "short_name": "EcoTour",
+  "description": "Sistem NFC tap souvenir wisata digital",
+  "start_url": "/tap",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#1D9E75",
+  "background_color": "#f7f7f5",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

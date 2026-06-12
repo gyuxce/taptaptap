@@ -1,0 +1,2125 @@
+'use client';
+
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  SmartphoneNfc, Scan, History, Settings, FilePlus2, 
+  LogOut, Activity, AlertTriangle, Zap, CheckCircle2, 
+  XCircle, ChevronRight, RefreshCw, Download, Store, Info,
+  PlusCircle
+} from 'lucide-react';
+
+import { useAuth } from '@/lib/auth';
+import { isSupabaseConfigured, db } from '@/lib/supabase';
+import { registerVisitorSchema, RegisterVisitorInput } from '@/lib/validations';
+import { fetchVisitorByUID, registerVisitor, checkCredit, deductCredit, topUpCredit } from '@/lib/services/visitorService';
+import { logTransaction, fetchTransactions, fetchTransactionStats } from '@/lib/services/transactionService';
+import { getMerchantByUserId } from '@/lib/services/merchantService';
+import { Visitor, Merchant, Transaction, RFIDTag } from '@/types';
+import { formatRupiah, formatDatetime, normalizeUID } from '@/lib/utils';
+
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Badge } from '@/components/ui/Badge';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { Toaster, toast } from '@/components/ui/Toast';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { StatCard } from '@/components/ui/StatCard';
+import { Modal } from '@/components/ui/Modal';
+
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+export default function MerchantTerminalPage() {
+  const router = useRouter();
+  const { user, profile, loading: authLoading, signOut } = useAuth();
+  
+  // Terminal State
+  const [merchant, setMerchant] = useState<Merchant | null>(null);
+  const [terminalLoading, setTerminalLoading] = useState(true);
+  const [activeDrawer, setActiveDrawer] = useState<'visitor' | 'error_unregistered' | 'double_tap' | 'credit_error' | 'register' | 'topup' | 'settings' | 'history' | null>(null);
+  const [simulationMode, setSimulationMode] = useState<boolean>(true);
+
+  // Settings Nominal Preset State
+  const [defaultNominal, setDefaultNominal] = useState<number>(25000);
+
+  // Scanning State
+  const [isScanning, setIsScanning] = useState(false);
+  const [nfcError, setNfcError] = useState<string | null>(null);
+  const [httpsWarning, setHttpsWarning] = useState(false);
+  const [tapScenarioLoading, setTapScenarioLoading] = useState(false);
+  const [isDemoRunning, setIsDemoRunning] = useState(false);
+
+  // Double Tap Prevention Ref
+  const lastScansRef = useRef<{ [uid: string]: number }>({});
+  const isSubmittingRef = useRef(false);
+
+  // Drawers and Overlays state
+  const [scannedUID, setScannedUID] = useState<string>('');
+  const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null);
+  const [selectedTag, setSelectedTag] = useState<RFIDTag | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState<string>('25000');
+  const [showManualAmount, setShowManualAmount] = useState(false);
+  const [confirmTapLoading, setConfirmTapLoading] = useState(false);
+  
+  // State 3: Double Tap info
+  const [doubleTapInfo, setDoubleTapInfo] = useState<{ uid: string; lastTime: string } | null>(null);
+
+  // Success Flash Overlay
+  const [showSuccessFlash, setShowSuccessFlash] = useState(false);
+  const [successVisitorName, setSuccessVisitorName] = useState('');
+
+  // Credit Error Drawer Details
+  const [creditErrorDetails, setCreditErrorDetails] = useState<{
+    requested: number;
+    remaining: number;
+    limit: number;
+  } | null>(null);
+
+  // Top Up Tab States
+  const [topUpScannedUID, setTopUpScannedUID] = useState('');
+  const [topUpVisitor, setTopUpVisitor] = useState<Visitor | null>(null);
+  const [topUpTag, setTopUpTag] = useState<RFIDTag | null>(null);
+  const [topUpAmount, setTopUpAmount] = useState('');
+  const [topUpNote, setTopUpNote] = useState('');
+  const [topUpLoading, setTopUpLoading] = useState(false);
+  const [topUpSuccessFlash, setTopUpSuccessFlash] = useState(false);
+  const [topUpSuccessAmount, setTopUpSuccessAmount] = useState(0);
+  const [topUpSuccessVisitorName, setTopUpSuccessVisitorName] = useState('');
+  const [topUpScanLoading, setTopUpScanLoading] = useState(false);
+  const [isTopUpScanning, setIsTopUpScanning] = useState(false);
+  const [topUpNfcError, setTopUpNfcError] = useState<string | null>(null);
+
+  // Registration Tab States
+  const [registerStep, setRegisterStep] = useState<1 | 2>(1);
+  const [newTagUID, setNewTagUID] = useState('');
+  const [newTagError, setNewTagError] = useState<string | null>(null);
+
+  // History Tab States
+  const [historyFilter, setHistoryFilter] = useState<'hari' | 'minggu' | 'bulan' | 'custom'>('hari');
+  const [customDateFrom, setCustomDateFrom] = useState('');
+  const [customDateTo, setCustomDateTo] = useState('');
+  const [historyTxs, setHistoryTxs] = useState<Transaction[]>([]);
+  const [historyTotalCount, setHistoryTotalCount] = useState(0);
+  const [historyStats, setHistoryStats] = useState({
+    today: { count: 0, total: 0 },
+    thisWeek: { count: 0, total: 0 },
+    thisMonth: { count: 0, total: 0 },
+  });
+  const [historyOffset, setHistoryOffset] = useState(0);
+  const [historyFetchLoading, setHistoryFetchLoading] = useState(false);
+  const [historyRefreshing, setHistoryRefreshing] = useState(false);
+
+  // Dialog Confirmations
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // Offline Mode Visitors for grid emulation
+  const [offlineVisitors, setOfflineVisitors] = useState<{ visitor: Visitor; tag: RFIDTag }[]>([]);
+
+  // 1. Auth check
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user || !profile) {
+        router.push('/');
+        return;
+      }
+      if (profile.role === 'admin') {
+        router.push('/dashboard');
+        return;
+      }
+      loadMerchantAndConfig(profile.id);
+    }
+  }, [user, profile, authLoading]);
+
+  // 2. Load simulation state from localstorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedSim = window.localStorage.getItem('ecotour_sim_mode');
+      setSimulationMode(storedSim !== 'false');
+
+      const storedNominal = window.localStorage.getItem('ecotour_default_nominal');
+      if (storedNominal) {
+        const parsed = Number(storedNominal);
+        setDefaultNominal(parsed);
+        setPaymentAmount(parsed.toString());
+      }
+    }
+  }, []);
+
+  // Cleanup scanning when activeDrawer changes
+  useEffect(() => {
+    setIsScanning(false);
+    setIsTopUpScanning(false);
+  }, [activeDrawer]);
+
+  const loadMerchantAndConfig = async (userId: string) => {
+    setTerminalLoading(true);
+    try {
+      const mData = await getMerchantByUserId(userId);
+      setMerchant(mData);
+      
+      // Load offline emulator visitors
+      if (typeof window !== 'undefined') {
+        const visList = await db.getVisitors();
+        const tagsList = await db.getRFIDTags();
+        const paired = visList.map(v => {
+          const t = tagsList.find(tag => tag.visitor_id === v.id && tag.is_active);
+          return t ? { visitor: v, tag: t } : null;
+        }).filter(item => item !== null) as { visitor: Visitor; tag: RFIDTag }[];
+        setOfflineVisitors(paired);
+      }
+
+      // Check protocol warnings
+      if (typeof window !== 'undefined') {
+        const isNotLocal = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+        const isNotHttps = window.location.protocol !== 'https:';
+        if (isNotLocal && isNotHttps) {
+          setHttpsWarning(true);
+        }
+      }
+    } catch (err) {
+      toast.error('Gagal memuat profil merchant');
+    } finally {
+      setTerminalLoading(false);
+    }
+  };
+
+  // Auto load today's stats on merchant load
+  useEffect(() => {
+    if (merchant) {
+      loadHistoryData(true);
+    }
+  }, [merchant]);
+
+  // 3. Auto reload stats & transactions every 30s in History Drawer
+  useEffect(() => {
+    if (activeDrawer === 'history' && merchant) {
+      loadHistoryData(false);
+      const timer = setInterval(() => {
+        loadHistoryData(true);
+      }, 30000);
+      return () => clearInterval(timer);
+    }
+  }, [activeDrawer, merchant, historyFilter, customDateFrom, customDateTo]);
+
+  const loadHistoryData = async (isSilent = false) => {
+    if (!merchant) return;
+    if (!isSilent) setHistoryFetchLoading(true);
+    else setHistoryRefreshing(true);
+
+    try {
+      // Load stats
+      const stats = await fetchTransactionStats(merchant.id);
+      setHistoryStats(stats);
+
+      // Load paginated list (offset = 0)
+      const dateRange: { dateFrom?: string; dateTo?: string } = {};
+      const now = new Date();
+      if (historyFilter === 'hari') {
+        dateRange.dateFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      } else if (historyFilter === 'minggu') {
+        const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1));
+        startOfWeek.setHours(0,0,0,0);
+        dateRange.dateFrom = startOfWeek.toISOString();
+      } else if (historyFilter === 'bulan') {
+        dateRange.dateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      } else if (historyFilter === 'custom') {
+        if (customDateFrom) dateRange.dateFrom = new Date(customDateFrom).toISOString();
+        if (customDateTo) {
+          const toDate = new Date(customDateTo);
+          toDate.setHours(23, 59, 59, 999);
+          dateRange.dateTo = toDate.toISOString();
+        }
+      }
+
+      const listRes = await fetchTransactions(merchant.id, {
+        ...dateRange,
+        limit: 50,
+        offset: 0,
+      });
+
+      setHistoryTxs(listRes.transactions);
+      setHistoryTotalCount(listRes.total);
+      setHistoryOffset(0);
+    } catch (err) {
+      console.error(err);
+      toast.error('Gagal mengambil riwayat transaksi');
+    } finally {
+      setHistoryFetchLoading(false);
+      setHistoryRefreshing(false);
+    }
+  };
+
+  const loadMoreHistory = async () => {
+    if (!merchant || historyFetchLoading) return;
+    setHistoryFetchLoading(true);
+
+    try {
+      const dateRange: { dateFrom?: string; dateTo?: string } = {};
+      const now = new Date();
+      if (historyFilter === 'hari') {
+        dateRange.dateFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      } else if (historyFilter === 'minggu') {
+        const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1));
+        startOfWeek.setHours(0,0,0,0);
+        dateRange.dateFrom = startOfWeek.toISOString();
+      } else if (historyFilter === 'bulan') {
+        dateRange.dateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      } else if (historyFilter === 'custom') {
+        if (customDateFrom) dateRange.dateFrom = new Date(customDateFrom).toISOString();
+        if (customDateTo) {
+          const toDate = new Date(customDateTo);
+          toDate.setHours(23, 59, 59, 999);
+          dateRange.dateTo = toDate.toISOString();
+        }
+      }
+
+      const nextOffset = historyOffset + 50;
+      const listRes = await fetchTransactions(merchant.id, {
+        ...dateRange,
+        limit: 50,
+        offset: nextOffset,
+      });
+
+      setHistoryTxs(prev => [...prev, ...listRes.transactions]);
+      setHistoryOffset(nextOffset);
+    } catch (err) {
+      toast.error('Gagal memuat transaksi berikutnya');
+    } finally {
+      setHistoryFetchLoading(false);
+    }
+  };
+
+  // 4. processScannedRFID Handler
+  const processScannedRFID = useCallback(async (uid: string) => {
+    if (!uid) return;
+    setScannedUID(uid);
+
+    if (navigator.vibrate) {
+      navigator.vibrate(50); // satu ketukan pendek
+    }
+
+    // Double Tap Prevention Check
+    const nowTimestamp = Date.now();
+    const lastScanTime = lastScansRef.current[uid];
+    if (lastScanTime && nowTimestamp - lastScanTime < 10000) {
+      // Trigger Double Tap Warning
+      setDoubleTapInfo({ uid, lastTime: new Date(lastScanTime).toLocaleTimeString('id-ID') });
+      setActiveDrawer('double_tap');
+      return;
+    }
+
+    setTapScenarioLoading(true);
+    try {
+      const res = await fetchVisitorByUID(uid);
+      if ('error' in res) {
+        if (res.error === 'TAG_NOT_FOUND') {
+          setActiveDrawer('error_unregistered');
+        } else if (res.error === 'TAG_INACTIVE') {
+          toast.error('Gelang RFID ini dinonaktifkan.');
+        } else {
+          toast.error('Pembacaan gagal: ' + res.error);
+        }
+      } else {
+        // Tag valid
+        setSelectedVisitor(res.visitor);
+        setSelectedTag(res.tag);
+        // Default defaultNominal preset
+        setPaymentAmount(defaultNominal.toString());
+        setActiveDrawer('visitor');
+      }
+    } catch (err) {
+      toast.error('Koneksi terganggu.');
+    } finally {
+      setTapScenarioLoading(false);
+    }
+  }, [defaultNominal]);
+
+  // 5. NDEFReader scan trigger
+  const triggerNFCScan = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    if (!('NDEFReader' in window)) {
+      setNfcError('Browser tidak mendukung Web NFC. Gunakan Google Chrome di Android.');
+      return;
+    }
+
+    if (isScanning) {
+      setIsScanning(false);
+      return;
+    }
+
+    setIsScanning(true);
+    setNfcError(null);
+    try {
+      const ndef = new (window as any).NDEFReader();
+      await ndef.scan();
+      ndef.onreading = (event: any) => {
+        const normalized = normalizeUID(event.serialNumber);
+        processScannedRFID(normalized);
+      };
+    } catch (err: any) {
+      console.error(err);
+      setNfcError('Gagal mendeteksi sensor: ' + (err.message || err));
+      setIsScanning(false);
+    }
+  }, [isScanning, processScannedRFID]);
+
+  // Top Up RFID Scan process
+  const processTopUpRFID = useCallback(async (uid: string) => {
+    if (!uid) return;
+    setTopUpScannedUID(uid);
+    setTopUpScanLoading(true);
+
+    if (navigator.vibrate) {
+      navigator.vibrate(50); // satu ketukan pendek
+    }
+
+    try {
+      const res = await fetchVisitorByUID(uid);
+      if ('error' in res) {
+        if (res.error === 'TAG_NOT_FOUND') {
+          toast.error('Gelang RFID belum terdaftar. Daftarkan di Tab Daftar.');
+        } else if (res.error === 'TAG_INACTIVE') {
+          toast.error('Gelang RFID ini dinonaktifkan.');
+        } else {
+          toast.error('Pembacaan gagal: ' + res.error);
+        }
+        setTopUpScannedUID('');
+      } else {
+        setTopUpVisitor(res.visitor);
+        setTopUpTag(res.tag);
+        setTopUpAmount('');
+        setTopUpNote('');
+      }
+    } catch (err) {
+      toast.error('Koneksi terganggu.');
+      setTopUpScannedUID('');
+    } finally {
+      setTopUpScanLoading(false);
+    }
+  }, []);
+
+  const triggerTopUpNFCScan = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    if (!('NDEFReader' in window)) {
+      setTopUpNfcError('Browser tidak mendukung Web NFC. Gunakan Google Chrome di Android.');
+      return;
+    }
+
+    if (isTopUpScanning) {
+      setIsTopUpScanning(false);
+      return;
+    }
+
+    setIsTopUpScanning(true);
+    setTopUpNfcError(null);
+    try {
+      const ndef = new (window as any).NDEFReader();
+      await ndef.scan();
+      ndef.onreading = (event: any) => {
+        const normalized = normalizeUID(event.serialNumber);
+        processTopUpRFID(normalized);
+      };
+    } catch (err: any) {
+      console.error(err);
+      setTopUpNfcError('Gagal mendeteksi sensor: ' + (err.message || err));
+      setIsTopUpScanning(false);
+    }
+  }, [isTopUpScanning, processTopUpRFID]);
+
+  const handleSimulateTopUpScan = async () => {
+    if (topUpScanLoading) return;
+    try {
+      const visList = await db.getVisitors();
+      const tagsList = await db.getRFIDTags();
+      const activePaired = visList.map(v => {
+        const t = tagsList.find(tag => tag.visitor_id === v.id && tag.is_active);
+        return t ? { visitor: v, tag: t } : null;
+      }).filter(item => item !== null) as { visitor: Visitor; tag: RFIDTag }[];
+
+      if (activePaired.length > 0) {
+        processTopUpRFID(activePaired[0].tag.uid);
+      } else {
+        toast.error('Tidak ada gelang terdaftar. Silakan ke Tab Daftar terlebih dahulu.');
+      }
+    } catch (err) {
+      toast.error('Gagal mengambil data simulator');
+    }
+  };
+
+  const handleConfirmTopUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!topUpVisitor || !topUpTag || !merchant) return;
+
+    const cleanAmount = parseInt(topUpAmount.replace(/\./g, ''), 10) || 0;
+    if (cleanAmount <= 0) {
+      toast.error('Nominal top up harus lebih besar dari Rp 0');
+      return;
+    }
+
+    setTopUpLoading(true);
+    try {
+      const res = await topUpCredit(topUpTag.uid, cleanAmount, merchant.id, topUpNote || undefined);
+
+      if (res.success) {
+        const updatedLimit = Number(topUpVisitor.credit_limit) + Number(cleanAmount);
+        
+        if (!isSupabaseConfigured) {
+          setOfflineVisitors(prev => prev.map(item => {
+            if (item.visitor.id === topUpVisitor.id) {
+              return {
+                ...item,
+                visitor: {
+                  ...item.visitor,
+                  credit_limit: updatedLimit
+                }
+              };
+            }
+            return item;
+          }));
+        }
+
+        setTopUpSuccessAmount(cleanAmount);
+        setTopUpSuccessVisitorName(topUpVisitor.name);
+        
+        setTopUpVisitor(null);
+        setTopUpTag(null);
+        setTopUpScannedUID('');
+
+        setTopUpSuccessFlash(true);
+        loadHistoryData(true);
+
+        if (navigator.vibrate) {
+          navigator.vibrate([100, 50, 100]); // dua ketukan
+        }
+      } else {
+        toast.error(res.error || 'Top Up gagal');
+      }
+    } catch (err) {
+      toast.error('Terjadi kesalahan, coba lagi');
+    } finally {
+      setTopUpLoading(false);
+    }
+  };
+
+  // 6. Confirm Tap Payment (Deduct credit and Log transaction)
+  const handleConfirmTap = useCallback(async (bypassDoubleTap = false) => {
+    if (!merchant || !scannedUID || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setConfirmTapLoading(true);
+
+    const chargeAmount = merchant.merchant_type === 'loket' ? 0 : Number(paymentAmount);
+
+    try {
+      // A. Check Credit first if payments are required
+      if (chargeAmount > 0 && selectedVisitor) {
+        const checkRes = await checkCredit(scannedUID, chargeAmount);
+        if (!checkRes.allowed) {
+          // Closed drawer, show credit error drawer
+          setActiveDrawer(null);
+          setCreditErrorDetails({
+            requested: chargeAmount,
+            remaining: checkRes.credit_remaining,
+            limit: checkRes.credit_limit
+          });
+          setTimeout(() => {
+            setActiveDrawer('credit_error');
+          }, 200);
+          isSubmittingRef.current = false;
+          setConfirmTapLoading(false);
+          return;
+        }
+      }
+
+      // B. Save timestamp for double tap prevention
+      if (!bypassDoubleTap) {
+        lastScansRef.current[scannedUID] = Date.now();
+      }
+
+      // C. Log transaction
+      const logRes = await logTransaction({
+        rfid_uid: scannedUID,
+        merchant_id: merchant.id,
+        type: merchant.merchant_type === 'loket' ? 'entry' : 'payment',
+        amount: chargeAmount,
+      });
+
+      if ('error' in logRes) {
+        toast.error(logRes.error);
+      } else {
+        // D. Deduct Credit locally/Supabase if regular payment
+        if (chargeAmount > 0 && selectedVisitor) {
+          await deductCredit(selectedVisitor.id, chargeAmount);
+        }
+
+        // E. Success Overlay
+        setSuccessVisitorName(selectedVisitor?.name || 'Wisatawan');
+        setActiveDrawer(null);
+        setShowSuccessFlash(true);
+
+        if (navigator.vibrate) {
+          navigator.vibrate([100, 50, 100]); // dua ketukan
+        }
+
+        // Reset
+        setSelectedVisitor(null);
+        setSelectedTag(null);
+        setScannedUID('');
+
+        // Reload data
+        loadHistoryData(true);
+      }
+    } catch (err) {
+      toast.error('Pencatatan gagal');
+    } finally {
+      setConfirmTapLoading(false);
+      isSubmittingRef.current = false;
+    }
+  }, [merchant, scannedUID, paymentAmount, selectedVisitor]);
+
+  // 7. Scenarios simulator
+  const runSimulatorScenario = async (type: 'VIP' | 'Regular' | 'ASING/BARU' | 'NONAKTIF' | 'KREDIT HABIS' | 'DOUBLE TAP') => {
+    if (tapScenarioLoading || isDemoRunning) return;
+    
+    // Scenarios mappings
+    const uids = {
+      VIP: 'E280113C200078AC', // Ahmad Faisal
+      Regular: 'E280113C200078AD', // Siti Rahmawati
+      'ASING/BARU': 'B1D3A9C8D72E15BF',
+      NONAKTIF: 'E280113C200078AE', // Dewi Lestari (let's set tag state inactive dynamically for demo)
+      'KREDIT HABIS': 'E280113C200078AF', // Budi (limit = 0? Wait, Budi limit 0. Eko Santoso limit 100k, used 25k. We can use a custom one)
+    };
+
+    if (type === 'NONAKTIF') {
+      // Toggle inactive temporarily in localStorage
+      const tags = await db.getRFIDTags();
+      const match = tags.find(t => t.uid === uids.NONAKTIF);
+      if (match) {
+        match.is_active = false;
+        window.localStorage.setItem('ecotour_rfid_tags', JSON.stringify(tags));
+      }
+    }
+
+    if (type === 'KREDIT HABIS') {
+      // Set limit low, credit used high for regular visitor Siti
+      const visitors = await db.getVisitors();
+      const match = visitors.find(v => v.id === 'v-2');
+      if (match) {
+        match.credit_limit = 10000;
+        match.credit_used = 10000; // 0 remaining
+        window.localStorage.setItem('ecotour_visitors', JSON.stringify(visitors));
+      }
+      processScannedRFID(uids.Regular);
+      return;
+    }
+
+    if (type === 'DOUBLE TAP') {
+      // We scan Sit's tag first
+      processScannedRFID(uids.Regular);
+      // Force lastScan timestamp to simulate tap inside 10 seconds
+      setTimeout(() => {
+        processScannedRFID(uids.Regular);
+      }, 500);
+      return;
+    }
+
+    const targetUID = type === 'ASING/BARU' ? uids['ASING/BARU'] : uids[type as keyof typeof uids];
+    processScannedRFID(targetUID);
+  };
+
+  // Run automated sequence loops
+  const runAutoDemo = async () => {
+    if (isDemoRunning) return;
+    setIsDemoRunning(true);
+    toast.info('Memulai demo tapping otomatis...');
+
+    const demoScenarios = ['VIP', 'Regular', 'ASING/BARU', 'KREDIT HABIS'] as const;
+    for (let i = 0; i < demoScenarios.length; i++) {
+      if (!isDemoRunning) break;
+      await new Promise(r => setTimeout(r, 2000));
+      toast.info(`Simulasi tap: ${demoScenarios[i]}`);
+      await runSimulatorScenario(demoScenarios[i]);
+    }
+    setIsDemoRunning(false);
+    toast.success('Demo otomatis selesai.');
+  };
+
+  // 8. Register Tab State hooks
+  const {
+    register: regForm,
+    handleSubmit: handleRegSubmit,
+    reset: resetRegForm,
+    formState: { errors: regErrors },
+  } = useForm<RegisterVisitorInput>({
+    resolver: zodResolver(registerVisitorSchema),
+    mode: 'onBlur',
+    defaultValues: {
+      name: '',
+      phone: '',
+      ticket_type: 'Regular',
+      credit_limit: 150000,
+    }
+  });
+
+  const onRegisterSubmit = async (data: RegisterVisitorInput) => {
+    if (!merchant || !newTagUID) return;
+    setConfirmTapLoading(true);
+
+    try {
+      const res = await registerVisitor(data, newTagUID, merchant.id);
+      if ('error' in res) {
+        toast.error(res.error);
+      } else {
+        toast.success('Wisatawan berhasil terdaftar!');
+        setSuccessVisitorName(res.visitor.name);
+        setRegisterStep(1);
+        setNewTagUID('');
+        resetRegForm();
+        
+        // Success flash trigger
+        setShowSuccessFlash(true);
+        // Refresh local paired lists
+        loadMerchantAndConfig(profile?.id || '');
+      }
+    } catch (err) {
+      toast.error('Registrasi gagal');
+    } finally {
+      setConfirmTapLoading(false);
+    }
+  };
+
+  const handleSimulateNewChip = () => {
+    const chars = '0123456789ABCDEF';
+    let uid = '';
+    for (let i = 0; i < 16; i++) {
+      uid += chars[Math.floor(Math.random() * 16)];
+    }
+    setNewTagUID(uid);
+    setNewTagError(null);
+    setRegisterStep(2);
+    toast.success('RFID Chip terdeteksi: ' + uid);
+  };
+
+  // 9. Export to CSV file
+  const handleExportCSV = () => {
+    if (historyTxs.length === 0) return;
+    
+    // CSV Header
+    let csvContent = 'data:text/csv;charset=utf-8,';
+    csvContent += 'Waktu,Nama Wisatawan,Tipe Tiket,Nominal,Status WA\r\n';
+
+    historyTxs.forEach(tx => {
+      const nominal = tx.amount === 0 ? 'Entry' : tx.amount;
+      const cleanName = (tx.visitor_name || 'Unknown').replace(/,/g, '');
+      const cleanTicketType = tx.ticket_type || 'Regular';
+      csvContent += `${tx.created_at},${cleanName},${cleanTicketType},${nominal},${tx.whatsapp_status}\r\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    const todayStr = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `laporan_${merchant?.id || 'terminal'}_${historyFilter}_${todayStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Laporan CSV diunduh!');
+  };
+
+  // 10. Settings Configuration handlers
+  const handleToggleSim = () => {
+    const nextVal = !simulationMode;
+    setSimulationMode(nextVal);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('ecotour_sim_mode', nextVal.toString());
+      toast.success(nextVal ? 'Mode simulasi diaktifkan' : 'Mode live database aktif');
+    }
+  };
+
+  const handleUpdateDefaultNominal = (val: string) => {
+    const num = Number(val);
+    if (!isNaN(num) && num >= 0) {
+      setDefaultNominal(num);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('ecotour_default_nominal', num.toString());
+      }
+    }
+  };
+
+  // Render Recharts volume data
+  const chartData = useMemo(() => {
+    const revenueByDay: { [date: string]: number } = {};
+    const last7Days = Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      return d.toISOString().split('T')[0];
+    }).reverse();
+
+    last7Days.forEach(day => {
+      revenueByDay[day] = 0;
+    });
+
+    historyTxs.forEach(tx => {
+      if (tx.type === 'payment') {
+        const day = tx.created_at.split('T')[0];
+        if (revenueByDay[day] !== undefined) {
+          revenueByDay[day] += tx.amount;
+        }
+      }
+    });
+
+    return Object.entries(revenueByDay).map(([date, revenue]) => {
+      const parts = date.split('-');
+      return {
+        date: `${parts[2]}/${parts[1]}`,
+        revenue
+      };
+    });
+  }, [historyTxs]);
+
+  if (authLoading || terminalLoading) {
+    return (
+      <div className="min-h-screen bg-[#f7f7f5] flex items-center justify-center flex-col gap-3">
+        <LoadingSpinner size="lg" />
+        <span className="text-xs font-bold text-[#64748b] tracking-wider uppercase">
+          Memuat terminal...
+        </span>
+      </div>
+    );
+  }
+
+  if (!merchant) {
+    return (
+      <div className="min-h-screen bg-[#f7f7f5] flex items-center justify-center flex-col p-6 text-center">
+        <Store className="h-16 w-16 text-red-500 mb-4" />
+        <h1 className="text-lg font-bold text-[#1e293b]">Terminal Tidak Terdaftar</h1>
+        <p className="text-xs text-gray-500 max-w-xs mt-1">
+          Akun ini belum dipasangkan dengan Merchant mana pun. Silakan hubungi administrator.
+        </p>
+        <Button onClick={() => signOut()} className="mt-4" size="sm">
+          Keluar
+        </Button>
+      </div>
+    );
+  }
+
+  const isEntryGate = merchant.merchant_type === 'loket';
+
+  const getContainerBg = () => {
+    if (nfcError || activeDrawer === 'error_unregistered' || activeDrawer === 'double_tap' || activeDrawer === 'credit_error') {
+      return 'bg-[#fff1f2]'; // error state
+    }
+    if (activeDrawer === 'register') {
+      return 'bg-[#f5f3ff]'; // register mode
+    }
+    if (activeDrawer === 'topup') {
+      return 'bg-[#eff6ff]'; // top up mode
+    }
+    if (isScanning) {
+      return 'bg-[#f0fdf4]'; // scanning active
+    }
+    return 'bg-[#f7f7f5]'; // normal/idle
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-slate-900 md:py-8 flex items-center justify-center font-sans">
+      <Toaster position="top-center" richColors />
+      
+      {/* Emulated Mobile Frame container */}
+      <div 
+        className={`w-full md:max-w-[448px] md:h-[860px] md:rounded-[40px] md:border-[10px] md:border-slate-800 md:shadow-2xl md:overflow-hidden flex flex-col relative h-[100dvh] max-h-screen select-none ${getContainerBg()}`}
+        style={{ transition: 'background-color 0.3s ease' }}
+      >
+        
+        {/* Success Flash overlay portal */}
+        <AnimatePresence>
+          {showSuccessFlash && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[#E1F5EE] z-50 flex flex-col items-center justify-center gap-4 text-center p-6"
+            >
+              <motion.div
+                initial={{ scale: 0.3, rotate: -45 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: 'spring', damping: 12 }}
+                className="w-24 h-24 rounded-full bg-[#1D9E75] flex items-center justify-center text-white shadow-lg"
+              >
+                <CheckCircle2 className="h-12 w-12" />
+              </motion.div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-black text-[#1D9E75] uppercase tracking-wide">
+                  Tap Berhasil Dicatat
+                </h3>
+                <p className="text-sm font-bold text-[#1e293b]">{successVisitorName}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSuccessFlash(false)}
+                className="mt-6 text-xs font-bold underline"
+              >
+                Selesai
+              </Button>
+              {/* Auto dismiss timer */}
+              {setTimeout(() => setShowSuccessFlash(false), 1800) && null}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Top Up Success Flash overlay portal */}
+        <AnimatePresence>
+          {topUpSuccessFlash && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[#eff6ff] z-50 flex flex-col items-center justify-center gap-4 text-center p-6"
+            >
+              <motion.div
+                initial={{ scale: 0.3, rotate: -45 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: 'spring', damping: 12 }}
+                className="w-24 h-24 rounded-full bg-[#2563EB] flex items-center justify-center text-white shadow-lg"
+              >
+                <CheckCircle2 className="h-12 w-12" />
+              </motion.div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-black text-[#2563EB] uppercase tracking-wide">
+                  Top Up Berhasil!
+                </h3>
+                <p className="text-sm font-bold text-[#1e293b]">
+                  {formatRupiah(topUpSuccessAmount)} ditambahkan ke {topUpSuccessVisitorName}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTopUpSuccessFlash(false)}
+                className="mt-6 text-xs font-bold text-blue-700 underline cursor-pointer"
+              >
+                Selesai
+              </Button>
+              {/* Auto dismiss timer */}
+              {setTimeout(() => setTopUpSuccessFlash(false), 2000) && null}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 1. TopBar sticky */}
+        <div className="bg-white border-b border-[#e5e3db] px-5 py-3.5 flex items-center justify-between shrink-0 sticky top-0 z-20">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {isEntryGate && (
+              <button
+                onClick={() => setActiveDrawer('register')}
+                className={`p-2 rounded-xl border transition-colors cursor-pointer mr-1.5 ${
+                  activeDrawer === 'register' || activeDrawer === 'topup'
+                    ? 'bg-[#f5f3ff] text-[#7C3AED] border-[#ddd6fe]'
+                    : 'bg-white text-gray-400 hover:text-[#1e293b] border-[#e5e3db]'
+                }`}
+                title="Layanan Loket"
+              >
+                <FilePlus2 className="h-4.5 w-4.5" />
+              </button>
+            )}
+            <div className="text-left min-w-0">
+              <h2 className="text-sm font-extrabold text-[#1e293b] truncate">
+                {merchant.name}
+              </h2>
+              <span className="text-[9px] text-[#64748b] font-semibold tracking-wider uppercase truncate block">
+                {merchant.location}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              Online
+            </span>
+            <button
+              onClick={() => setActiveDrawer('settings')}
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                activeDrawer === 'settings'
+                  ? 'bg-slate-100 text-[#1e293b] border-slate-300'
+                  : 'text-gray-400 hover:text-[#1e293b] hover:bg-gray-100 border-[#e5e3db]'
+              }`}
+            >
+              <Settings className="h-4.5 w-4.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* 2. Simulation Banner */}
+        {simulationMode && (
+          <div className="bg-amber-500 text-white text-[10px] font-extrabold uppercase tracking-widest text-center py-1.5 shrink-0 z-20">
+            ● Mode Demo Aktif
+          </div>
+        )}
+
+        {/* 3. Main Content Area */}
+        <div className="flex-1 flex flex-col justify-between p-4 overflow-hidden">
+          
+          {/* NFC PULSE CONTAINER (60% height layout) */}
+          <div className="flex-grow flex flex-col items-center justify-center text-center gap-6">
+            
+            {/* NFC Rings & Pulser */}
+            <div className="relative w-44 h-44 flex items-center justify-center">
+              
+              {/* Concentric rings */}
+              <div className="absolute inset-0 rounded-full border border-[#1D9E75]/20 animate-ping" />
+              <div className="absolute inset-6 rounded-full border border-[#1D9E75]/35 animate-ping" style={{ animationDelay: '0.4s' }} />
+
+              <button
+                onClick={triggerNFCScan}
+                disabled={isScanning || tapScenarioLoading}
+                className="w-32 h-32 rounded-full bg-[#1D9E75] hover:bg-[#168260] active:scale-95 transition-all text-white flex flex-col items-center justify-center gap-2.5 shadow-lg shadow-[#1D9E75]/25 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed z-10"
+              >
+                <SmartphoneNfc className={`h-11 w-11 ${isScanning ? 'animate-bounce' : ''}`} />
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  {isScanning ? 'PULSE ON' : 'TAP'}
+                </span>
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-sm font-black text-[#1e293b]">Tempelkan Souvenir</h3>
+              <p className="text-xs text-[#64748b] font-semibold">Dekatkan gelang atau kalung wisatawan ke HP</p>
+            </div>
+
+            {/* Compatibility Warnings */}
+            {nfcError && (
+              <div className="bg-red-50 border border-red-200 text-[#DC2626] text-[10px] font-bold px-3.5 py-2.5 rounded-2xl flex items-start gap-2 max-w-xs mx-auto text-left leading-normal">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
+                <div>
+                  <p className="font-extrabold">Web NFC Tidak Tersedia</p>
+                  <p className="text-[9px] font-medium text-red-600 mt-0.5">NFC Reader hanya didukung pada Chrome Android. Silakan gunakan panel simulator di bawah.</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* SIMULATOR GRID SCENARIOS (Compact size) */}
+          {simulationMode && (
+            <div className="my-2 bg-white/70 border border-[#e5e3db] rounded-2xl p-3 text-left shrink-0">
+              <div className="flex items-center justify-between border-b border-[#e5e3db]/60 pb-1.5 mb-1.5">
+                <span className="text-[9px] font-black uppercase tracking-wider text-amber-600 flex items-center gap-1">
+                  <Zap className="h-3 w-3" /> Gelang Simulator
+                </span>
+                <button
+                  onClick={runAutoDemo}
+                  disabled={isDemoRunning}
+                  className="text-[9px] font-bold bg-[#E1F5EE] text-[#1D9E75] px-2.5 py-0.5 rounded-full cursor-pointer hover:bg-[#cbeedf] disabled:opacity-50"
+                >
+                  {isDemoRunning ? 'Menjalankan...' : 'Demo Otomatis'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-1.5 text-[9px] font-bold">
+                <button
+                  onClick={() => runSimulatorScenario('VIP')}
+                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-[#E1F5EE] rounded-lg text-center text-[#1e293b] cursor-pointer"
+                >
+                  VIP
+                </button>
+                <button
+                  onClick={() => runSimulatorScenario('Regular')}
+                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-[#E1F5EE] rounded-lg text-center text-[#1e293b] cursor-pointer"
+                >
+                  Reguler
+                </button>
+                <button
+                  onClick={() => runSimulatorScenario('ASING/BARU')}
+                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-purple-50 rounded-lg text-center text-[#7C3AED] cursor-pointer"
+                >
+                  Asing
+                </button>
+                <button
+                  onClick={() => runSimulatorScenario('NONAKTIF')}
+                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-red-50 rounded-lg text-center text-red-700 cursor-pointer"
+                >
+                  Nonaktif
+                </button>
+                <button
+                  onClick={() => runSimulatorScenario('KREDIT HABIS')}
+                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-red-50 rounded-lg text-center text-red-700 cursor-pointer"
+                >
+                  Decline
+                </button>
+                <button
+                  onClick={() => runSimulatorScenario('DOUBLE TAP')}
+                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-amber-50 rounded-lg text-center text-amber-700 cursor-pointer"
+                >
+                  Double Tap
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STATS OVERVIEW CARD */}
+          <div className="bg-white border border-[#e5e3db] rounded-2xl p-3 flex items-center justify-between shadow-2xs my-1 text-left shrink-0">
+            <div>
+              <p className="text-[9px] font-bold text-[#64748b] uppercase tracking-wider">Tapping Hari Ini</p>
+              <h4 className="text-xs font-black text-[#1e293b] mt-0.5">{historyStats.today.count} Taps</h4>
+            </div>
+            {!isEntryGate && (
+              <div className="text-right">
+                <p className="text-[9px] font-bold text-[#64748b] uppercase tracking-wider">Revenue Hari Ini</p>
+                <h4 className="text-xs font-black text-[#1D9E75] mt-0.5">{formatRupiah(historyStats.today.total)}</h4>
+              </div>
+            )}
+          </div>
+
+          {/* COLLAPSIBLE 5 LAST TRANSACTIONS */}
+          <div 
+            onClick={() => setActiveDrawer('history')}
+            className="bg-white border border-[#e5e3db] rounded-2xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow cursor-pointer text-left shrink-0 select-none mt-1"
+          >
+            <div className="flex items-center justify-between border-b border-[#e5e3db] pb-2 mb-2">
+              <span className="text-[10px] font-black text-[#1e293b] uppercase tracking-wider flex items-center gap-1">
+                <History className="h-3.5 w-3.5 text-slate-400" /> Riwayat 5 Terakhir
+              </span>
+              <span className="text-[9px] font-bold text-[#1D9E75] uppercase tracking-wider bg-[#E1F5EE] px-2 py-0.5 rounded-full">
+                Lihat Semua
+              </span>
+            </div>
+            
+            <div className="space-y-1.5">
+              {historyTxs.slice(0, 5).map((tx) => (
+                <div key={tx.id} className="flex justify-between items-center text-[10px] text-[#1e293b]">
+                  <span className="font-bold flex items-center gap-1.5 truncate">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0" />
+                    {tx.visitor_name || 'Wisatawan'}
+                  </span>
+                  <span className="font-semibold text-gray-400 font-mono text-[9px] shrink-0 ml-2">
+                    {tx.type === 'entry' ? 'Masuk' : formatRupiah(tx.amount)} · {new Date(tx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              ))}
+              {historyTxs.length === 0 && (
+                <p className="text-[10px] text-gray-400 font-medium py-1 text-center">Belum ada transaksi</p>
+              )}
+            </div>
+          </div>
+
+        </div>
+
+        {/* ===================================================================
+            MODALS & DRAWERS (SLIDE-UP SHEETS)
+            =================================================================== */}
+
+        {/* A. VISITOR CARD DRAWER */}
+        <Modal
+          isOpen={activeDrawer === 'visitor'}
+          onClose={() => {
+            setActiveDrawer(null);
+            setSelectedVisitor(null);
+            setSelectedTag(null);
+            setScannedUID('');
+            setPaymentAmount('');
+            setShowManualAmount(false);
+          }}
+          title="Data Kartu Wisatawan"
+        >
+          {selectedVisitor && selectedTag && (
+            <div className="flex flex-col gap-4 text-left">
+              
+              {/* Header Visitor Profile */}
+              <div className="flex items-center gap-3 bg-white p-3 border border-[#e5e3db] rounded-2xl">
+                <div className="w-12 h-12 rounded-2xl bg-[#E1F5EE] text-[#1D9E75] font-black flex items-center justify-center text-sm border border-[#1D9E75]/20">
+                  {selectedVisitor.name.substring(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-[#1e293b] leading-tight">
+                    {selectedVisitor.name}
+                  </h4>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <Badge variant={selectedVisitor.ticket_type}>
+                      {selectedVisitor.ticket_type}
+                    </Badge>
+                    <span className="text-[9px] font-mono text-gray-400 tracking-wider">
+                      {selectedTag.uid}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info Rows */}
+              <div className="bg-white p-3 border border-[#e5e3db] rounded-2xl text-[11px] space-y-2 text-gray-500">
+                <div className="flex justify-between">
+                  <span>No. HP WhatsApp</span>
+                  <span className="font-bold text-[#1e293b]">{selectedVisitor.phone || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Terdaftar Oleh Pos</span>
+                  <span className="font-bold text-[#1e293b]">{selectedTag.registered_by || 'Loket'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tanggal Masuk</span>
+                  <span className="font-bold text-[#1e293b]">{new Date(selectedTag.registered_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+
+              {/* Credit details progress bar */}
+              {selectedVisitor.credit_limit > 0 && (
+                <div className="bg-white p-4 border border-[#e5e3db] rounded-2xl space-y-2">
+                  <div className="flex justify-between text-xs font-bold text-[#1e293b]">
+                    <span>Sisa Kredit NFC</span>
+                    <span className={
+                      (selectedVisitor.credit_limit - selectedVisitor.credit_used) / selectedVisitor.credit_limit > 0.5
+                        ? 'text-green-600'
+                        : (selectedVisitor.credit_limit - selectedVisitor.credit_used) / selectedVisitor.credit_limit > 0.2
+                        ? 'text-amber-600'
+                        : 'text-red-600'
+                    }>
+                      Sisa: {formatRupiah(selectedVisitor.credit_limit - selectedVisitor.credit_used)}
+                    </span>
+                  </div>
+                  
+                  {/* Progress Line */}
+                  <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden relative">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        (selectedVisitor.credit_limit - selectedVisitor.credit_used) / selectedVisitor.credit_limit > 0.5
+                          ? 'bg-[#1D9E75]'
+                          : (selectedVisitor.credit_limit - selectedVisitor.credit_used) / selectedVisitor.credit_limit > 0.2
+                          ? 'bg-amber-500'
+                          : 'bg-red-500'
+                      }`}
+                      style={{ width: `${Math.max(0, Math.min(100, ((selectedVisitor.credit_limit - selectedVisitor.credit_used) / selectedVisitor.credit_limit) * 100))}%` }}
+                    />
+                  </div>
+
+                  <div className="flex justify-between text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                    <span>Terpakai: {formatRupiah(selectedVisitor.credit_used)}</span>
+                    <span>Total Limit: {formatRupiah(selectedVisitor.credit_limit)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Preset Grid Nominal (Regular merchant payment only) */}
+              {!isEntryGate && (
+                <div className="bg-white p-4 border border-[#e5e3db] rounded-2xl flex flex-col gap-3">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">
+                    Nominal Belanja (Rp)
+                  </label>
+
+                  {!showManualAmount ? (
+                    <>
+                      {/* Grid 2x3 */}
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {[25000, 50000, 75000, 100000, 150000, 200000].map((val) => {
+                          const isSelected = Number(paymentAmount) === val;
+                          return (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => setPaymentAmount(val.toString())}
+                              className={`py-3 text-center text-xs font-black rounded-xl transition-all cursor-pointer border active:scale-98 ${
+                                isSelected
+                                  ? 'bg-[#1D9E75] text-white border-transparent shadow-xs'
+                                  : 'bg-[#f7f7f5] text-[#1e293b] border-[#e5e3db] hover:bg-slate-100'
+                              }`}
+                            >
+                              {formatRupiah(val)}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Manual Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowManualAmount(true);
+                          setPaymentAmount('');
+                        }}
+                        className="w-full py-2.5 text-center text-xs font-bold text-slate-500 bg-slate-50 border border-[#e5e3db] border-dashed rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+                      >
+                        Jumlah lain...
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          value={paymentAmount}
+                          onChange={(e) => setPaymentAmount(e.target.value)}
+                          disabled={confirmTapLoading}
+                          autoFocus
+                          placeholder="Masukkan nominal"
+                          className="flex-1 px-4 py-2.5 text-sm bg-[#f7f7f5] text-[#1D9E75] font-black border border-[#e5e3db] rounded-xl outline-none focus:border-[#1D9E75]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowManualAmount(false);
+                            setPaymentAmount('');
+                          }}
+                          className="px-3.5 bg-slate-100 border border-[#e5e3db] text-[#1e293b] font-bold rounded-xl text-xs hover:bg-slate-200 cursor-pointer"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                      {paymentAmount && !isNaN(Number(paymentAmount)) && (
+                        <span className="text-[10px] font-bold text-gray-400 text-left mt-0.5">
+                          Preview: {formatRupiah(Number(paymentAmount))}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Actions submit/confirm */}
+              <div className="flex flex-col gap-2.5 pt-2">
+                {(() => {
+                  const isValidAmount = Number(paymentAmount) > 0;
+                  const isHighlighted = !isEntryGate && isValidAmount;
+
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => handleConfirmTap(false)}
+                      disabled={confirmTapLoading || !selectedTag.is_active || (!isEntryGate && !isValidAmount)}
+                      className={`w-full text-xs py-3.5 font-black uppercase tracking-wider transition-all duration-200 rounded-xl text-center cursor-pointer ${
+                        isEntryGate
+                          ? 'bg-[#1D9E75] text-white hover:bg-[#168260]'
+                          : isHighlighted
+                          ? 'bg-[#1D9E75] text-white hover:bg-[#168260] shadow-md shadow-[#1D9E75]/35 ring-4 ring-[#1D9E75]/25 scale-[1.01]'
+                          : 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed'
+                      }`}
+                    >
+                      {confirmTapLoading 
+                        ? 'Memproses...'
+                        : isEntryGate
+                        ? 'Konfirmasi Tap Masuk'
+                        : `Konfirmasi Pembayaran ${formatRupiah(Number(paymentAmount || 0))}`}
+                    </button>
+                  );
+                })()}
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setActiveDrawer(null);
+                    setSelectedVisitor(null);
+                    setSelectedTag(null);
+                    setScannedUID('');
+                    setPaymentAmount('');
+                    setShowManualAmount(false);
+                  }}
+                  disabled={confirmTapLoading}
+                  className="text-xs font-bold text-[#64748b] hover:text-[#1e293b]"
+                >
+                  Tutup
+                </Button>
+              </div>
+
+            </div>
+          )}
+        </Modal>
+
+        {/* B. LAYANAN LOKET DRAWER (UNIFIED REGISTER & TOP UP) */}
+        <Modal
+          isOpen={activeDrawer === 'register' || activeDrawer === 'topup'}
+          onClose={() => {
+            setActiveDrawer(null);
+            setTopUpVisitor(null);
+            setTopUpTag(null);
+            setTopUpScannedUID('');
+            setNewTagUID('');
+            setRegisterStep(1);
+          }}
+          title="Layanan Loket"
+        >
+          <div className="flex flex-col gap-5 text-left">
+            {/* Unified Tabs Bar Header */}
+            <div className="grid grid-cols-2 gap-2 bg-[#f1efe9]/40 p-1 rounded-2xl border border-[#e5e3db]">
+              <button
+                type="button"
+                onClick={() => setActiveDrawer('register')}
+                className={`py-2 text-center text-xs font-black rounded-xl transition-all cursor-pointer ${
+                  activeDrawer === 'register'
+                    ? 'bg-[#7C3AED] text-white shadow-xs'
+                    : 'text-gray-500 hover:text-[#7C3AED]'
+                }`}
+              >
+                Daftar Gelang
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveDrawer('topup')}
+                className={`py-2 text-center text-xs font-black rounded-xl transition-all cursor-pointer ${
+                  activeDrawer === 'topup'
+                    ? 'bg-[#2563EB] text-white shadow-xs'
+                    : 'text-gray-500 hover:text-[#2563EB]'
+                }`}
+              >
+                Top Up Saldo
+              </button>
+            </div>
+
+            {/* TAB REGISTER CONTENT */}
+            {activeDrawer === 'register' && (
+              <div className="flex flex-col gap-4 text-left animate-fadeIn">
+                {registerStep === 1 ? (
+                  <div className="flex flex-col items-center text-center gap-5 py-6">
+                    <div className="w-24 h-24 rounded-full bg-[#f5f3ff] border border-[#ddd6fe] flex items-center justify-center text-[#7C3AED] shadow-sm relative">
+                      <div className="absolute inset-0 rounded-full border border-[#7C3AED]/20 animate-ping" />
+                      <Scan className="h-9 w-9 animate-pulse" />
+                    </div>
+
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-black text-[#1e293b]">Pindai Chip RFID Baru</h3>
+                      <p className="text-xs text-[#64748b] max-w-xs leading-relaxed font-medium">
+                        Dekatkan gelang souvenir baru yang belum terdaftar ke perangkat scanner.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleSimulateNewChip}
+                      className="w-full text-xs font-black bg-[#7C3AED] hover:bg-[#6D28D9] focus:ring-[#7C3AED] text-white py-3 rounded-xl transition-all cursor-pointer"
+                    >
+                      Simulasikan Chip Baru (UID Acak)
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleRegSubmit(onRegisterSubmit)} className="flex flex-col gap-4 text-left">
+                    <div className="border-b border-[#e5e3db] pb-3 mb-1">
+                      <span className="text-[10px] font-bold text-[#7C3AED] uppercase tracking-widest block">
+                        RFID Terpaut
+                      </span>
+                      <span className="text-xs font-mono font-bold text-[#1e293b] tracking-wider block truncate select-all">
+                        {newTagUID}
+                      </span>
+                    </div>
+
+                    <Input
+                      label="Nama Lengkap Wisatawan *"
+                      placeholder="Masukkan nama"
+                      error={regErrors.name?.message}
+                      icon={<Scan className="h-4 w-4 text-[#7C3AED]" />}
+                      disabled={confirmTapLoading}
+                      {...regForm('name')}
+                    />
+
+                    <Input
+                      label="Nomor HP WhatsApp"
+                      placeholder="Contoh: 08123456789"
+                      error={regErrors.phone?.message}
+                      icon={<Activity className="h-4 w-4" />}
+                      disabled={confirmTapLoading}
+                      {...regForm('phone')}
+                    />
+
+                    <div className="flex flex-col gap-1.5 text-left">
+                      <label className="text-xs font-bold uppercase tracking-wider text-[#64748b]">
+                        Jenis Tiket
+                      </label>
+                      <select
+                        disabled={confirmTapLoading}
+                        className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#7C3AED] focus:ring-2 focus:ring-[#f5f3ff] transition-all duration-200"
+                        {...regForm('ticket_type')}
+                      >
+                        <option value="Regular">Regular</option>
+                        <option value="VIP">VIP</option>
+                        <option value="Family">Family</option>
+                        <option value="Group">Group</option>
+                      </select>
+                    </div>
+
+                    <Input
+                      label="Batas Kredit Awal (Rp)"
+                      type="number"
+                      placeholder="150000"
+                      error={regErrors.credit_limit?.message}
+                      disabled={confirmTapLoading}
+                      {...regForm('credit_limit', { valueAsNumber: true })}
+                    />
+
+                    <div className="flex gap-2.5 mt-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setRegisterStep(1);
+                          setNewTagUID('');
+                          resetRegForm();
+                        }}
+                        disabled={confirmTapLoading}
+                        className="w-1/3 text-xs border border-[#e5e3db] font-bold"
+                      >
+                        Batal
+                      </Button>
+                      <button
+                        type="submit"
+                        disabled={confirmTapLoading}
+                        className="w-2/3 text-xs font-black bg-[#7C3AED] hover:bg-[#6D28D9] focus:ring-[#7C3AED] text-white py-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                      >
+                        {confirmTapLoading ? 'Memproses...' : 'Daftarkan Gelang'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* TAB TOP UP CONTENT */}
+            {activeDrawer === 'topup' && (
+              <div className="flex flex-col gap-4 text-left animate-fadeIn">
+                {!topUpVisitor || !topUpTag ? (
+                  /* Scanner Screen */
+                  <div className="flex flex-col items-center text-center gap-6 py-4">
+                    <div className="relative w-32 h-32 flex items-center justify-center">
+                      <div className="absolute inset-0 rounded-full border border-blue-500/20 animate-ping" />
+                      <div className="absolute inset-4 rounded-full border border-blue-500/35 animate-ping" style={{ animationDelay: '0.4s' }} />
+
+                      <button
+                        type="button"
+                        onClick={triggerTopUpNFCScan}
+                        disabled={isTopUpScanning || topUpScanLoading}
+                        className="w-24 h-24 rounded-full bg-[#2563EB] hover:bg-[#1d4ed8] active:scale-95 transition-all text-white flex flex-col items-center justify-center gap-1.5 shadow-lg shadow-blue-500/20 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed z-10"
+                      >
+                        <SmartphoneNfc className={`h-8 w-8 ${isTopUpScanning ? 'animate-bounce' : ''}`} />
+                        <span className="text-[9px] font-black uppercase tracking-widest">
+                          {isTopUpScanning ? 'ON' : 'TAP'}
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-black text-[#1e293b]">Tempelkan Gelang</h3>
+                      <p className="text-xs text-[#64748b] font-medium">Scan gelang terdaftar untuk melakukan top up</p>
+                    </div>
+
+                    {simulationMode ? (
+                      <button
+                        type="button"
+                        onClick={handleSimulateTopUpScan}
+                        disabled={topUpScanLoading}
+                        className="w-full py-3 px-4 border border-blue-200 bg-[#eff6ff] hover:bg-blue-100 rounded-xl transition-all cursor-pointer font-black text-blue-700 text-center text-xs"
+                      >
+                        {topUpScanLoading ? 'Memproses...' : 'Simulasikan Scan (Wisatawan Terdaftar)'}
+                      </button>
+                    ) : (
+                      /* Offline lists */
+                      <div className="w-full flex flex-col gap-2 max-h-[160px] overflow-y-auto pr-1">
+                        {offlineVisitors.map(({ visitor: v, tag: t }) => (
+                          <button
+                            key={v.id}
+                            type="button"
+                            onClick={() => processTopUpRFID(t.uid)}
+                            className="flex items-center justify-between p-2.5 bg-[#f7f7f5] border border-[#e5e3db] rounded-xl text-left hover:bg-[#eff6ff] hover:border-blue-300 transition-all text-xs cursor-pointer"
+                          >
+                            <div>
+                              <p className="font-bold text-[#1e293b]">{v.name}</p>
+                              <p className="text-[10px] text-gray-400 font-mono">{t.uid}</p>
+                            </div>
+                            <Badge variant={v.ticket_type}>{v.ticket_type}</Badge>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Form Input Top Up */
+                  <div className="flex flex-col gap-4">
+                    {/* Profile Header */}
+                    <div className="flex items-center gap-3 bg-white p-3 border border-[#e5e3db] rounded-2xl">
+                      <div className="w-11 h-11 rounded-2xl bg-[#eff6ff] text-[#2563EB] font-black flex items-center justify-center text-sm border border-blue-100">
+                        {topUpVisitor.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-[#1e293b] leading-tight">{topUpVisitor.name}</h4>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <Badge variant={topUpVisitor.ticket_type}>{topUpVisitor.ticket_type}</Badge>
+                          <span className="text-[9px] font-mono text-gray-400 tracking-wider">{topUpTag.uid}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Limit status */}
+                    <div className="bg-white p-4 border border-[#e5e3db] rounded-2xl space-y-2">
+                      <div className="flex justify-between text-xs font-bold text-[#1e293b]">
+                        <span>Kredit Saat Ini</span>
+                        <span className="text-[#2563EB]">
+                          Sisa: {topUpVisitor.credit_limit === 0 ? 'Unlimited' : formatRupiah(topUpVisitor.credit_limit - topUpVisitor.credit_used)}
+                        </span>
+                      </div>
+                      
+                      {/* Progress Line */}
+                      <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden relative">
+                        <div
+                          className="h-full bg-blue-500 transition-all duration-300"
+                          style={{ width: `${topUpVisitor.credit_limit === 0 ? 0 : Math.max(0, Math.min(100, (topUpVisitor.credit_used / topUpVisitor.credit_limit) * 100))}%` }}
+                        />
+                      </div>
+                      
+                      <div className="flex justify-between text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                        <span>Terpakai: {formatRupiah(topUpVisitor.credit_used)}</span>
+                        <span>Total Limit: {topUpVisitor.credit_limit === 0 ? 'Unlimited' : formatRupiah(topUpVisitor.credit_limit)}</span>
+                      </div>
+                    </div>
+
+                    {/* Inputs */}
+                    <div className="bg-white p-4 border border-[#e5e3db] rounded-2xl flex flex-col gap-3">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">
+                        Nominal Top Up
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[50000, 100000, 200000, 500000].map((val) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setTopUpAmount(val.toLocaleString('id-ID'))}
+                            className="py-2.5 text-center text-xs font-bold text-blue-600 bg-[#eff6ff] border border-transparent rounded-xl hover:bg-blue-100 transition-colors cursor-pointer active:scale-95"
+                          >
+                            {formatRupiah(val)}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-gray-400 block font-semibold mt-1">atau masukkan nominal lain:</span>
+                        <Input
+                          placeholder="Masukkan nominal"
+                          value={topUpAmount}
+                          onChange={(e) => {
+                            const cleaned = e.target.value.replace(/\D/g, '');
+                            if (!cleaned) {
+                              setTopUpAmount('');
+                            } else {
+                              setTopUpAmount(parseInt(cleaned, 10).toLocaleString('id-ID'));
+                            }
+                          }}
+                          icon={<span className="text-xs font-bold text-gray-500 select-none">Rp</span>}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Preview limit */}
+                    {(() => {
+                      const cleanAmt = parseInt(topUpAmount.replace(/\./g, ''), 10) || 0;
+                      const newLimit = Number(topUpVisitor.credit_limit) + cleanAmt;
+                      const isValid = cleanAmt > 0;
+
+                      return (
+                        <div className={`p-3.5 rounded-xl border text-xs font-bold flex justify-between items-center transition-all ${
+                          isValid
+                            ? 'bg-green-50 border-green-200 text-green-700'
+                            : 'bg-[#f1efe9]/50 border-[#e5e3db] text-gray-400'
+                        }`}>
+                          <span>Batas kredit setelah top up:</span>
+                          <span>{topUpVisitor.credit_limit === 0 ? 'Unlimited' : formatRupiah(newLimit)}</span>
+                        </div>
+                      );
+                    })()}
+
+                    <Input
+                      label="Catatan (Opsional)"
+                      placeholder="Pembelian paket..."
+                      value={topUpNote}
+                      onChange={(e) => setTopUpNote(e.target.value)}
+                    />
+
+                    {/* Actions */}
+                    <div className="flex flex-col gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleConfirmTopUp}
+                        disabled={topUpLoading || !(parseInt(topUpAmount.replace(/\./g, ''), 10) > 0)}
+                        className="w-full text-xs font-black bg-[#2563EB] hover:bg-[#1d4ed8] focus:ring-blue-500 text-white py-3 rounded-xl transition-all cursor-pointer shadow-sm text-center"
+                      >
+                        {topUpLoading ? 'Memproses...' : 'Konfirmasi Top Up'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTopUpVisitor(null);
+                          setTopUpTag(null);
+                          setTopUpScannedUID('');
+                        }}
+                        disabled={topUpLoading}
+                        className="w-full text-xs font-bold text-gray-500 hover:text-gray-800 text-center py-2.5 cursor-pointer"
+                      >
+                        Batal & Scan Ulang
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </Modal>
+
+        {/* C. TAG NOT REGISTERED WARNING */}
+        <Modal
+          isOpen={activeDrawer === 'error_unregistered'}
+          onClose={() => {
+            setActiveDrawer(null);
+            setScannedUID('');
+          }}
+          title="Chip Tidak Dikenal"
+        >
+          <div className="flex flex-col items-center text-center gap-5">
+            <div className="w-16 h-16 rounded-full bg-red-50 border border-red-100 flex items-center justify-center text-[#DC2626] shadow-sm shrink-0">
+              <AlertTriangle className="h-8 w-8" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-base font-black text-[#1e293b]">Pass Tidak Terdaftar</h3>
+              <p className="text-xs text-[#64748b] leading-relaxed">
+                Gelang NFC dengan serial code UID di bawah belum didaftarkan pada database loket utama.
+              </p>
+              <span className="inline-block font-mono font-bold text-xs bg-slate-100 px-3 py-1.5 rounded-lg text-slate-700 tracking-wider mt-2">
+                {scannedUID}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-2.5 w-full pt-2">
+              {isEntryGate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewTagUID(scannedUID);
+                    setRegisterStep(2);
+                    setActiveDrawer('register');
+                  }}
+                  className="w-full text-xs font-black bg-[#7C3AED] hover:bg-[#6D28D9] focus:ring-[#7C3AED] text-white py-3 rounded-xl transition-all cursor-pointer text-center"
+                >
+                  Daftarkan Sekarang
+                </button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setActiveDrawer(null);
+                  setScannedUID('');
+                }}
+                className="w-full text-xs font-bold border border-[#e5e3db] bg-[#f7f7f5] text-[#1e293b]"
+              >
+                Tutup Notifikasi
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* D. DOUBLE TAP WARNING DRAWER */}
+        <Modal
+          isOpen={activeDrawer === 'double_tap'}
+          onClose={() => {
+            setActiveDrawer(null);
+            setScannedUID('');
+            setDoubleTapInfo(null);
+          }}
+          title="Proteksi Tap Ganda"
+        >
+          <div className="flex flex-col items-center text-center gap-5">
+            <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-[#D97706] shadow-sm shrink-0">
+              <Zap className="h-8 w-8" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-base font-black text-amber-600">Double Tap Terdeteksi</h3>
+              <p className="text-xs text-[#64748b] leading-relaxed max-w-xs">
+                Sistem mencegah transaksi ganda tidak disengaja. Gelang yang sama baru saja dipindai pada jam:
+              </p>
+              <div className="bg-slate-100 font-bold text-xs p-3 rounded-xl text-slate-700 font-mono inline-block tracking-wider">
+                UID: {doubleTapInfo?.uid} <br />
+                <span className="text-[10px] text-gray-400 font-medium font-sans">Tap Terakhir: {doubleTapInfo?.lastTime}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2.5 w-full pt-3">
+              <button
+                type="button"
+                onClick={() => handleConfirmTap(true)}
+                className="w-1/2 text-xs font-black bg-amber-500 hover:bg-amber-600 focus:ring-amber-450 text-white py-3 rounded-xl transition-all cursor-pointer text-center"
+              >
+                Lanjutkan Tetap
+              </button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setActiveDrawer(null);
+                  setScannedUID('');
+                  setDoubleTapInfo(null);
+                }}
+                className="w-1/2 text-xs font-bold border border-[#e5e3db]"
+              >
+                Batal
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* E. CREDIT EXHAUSTED / ERROR DRAWER */}
+        <Modal
+          isOpen={activeDrawer === 'credit_error'}
+          onClose={() => {
+            setActiveDrawer(null);
+            setCreditErrorDetails(null);
+          }}
+          title="Potongan Kredit Gagal"
+        >
+          {creditErrorDetails && (
+            <div className="flex flex-col items-center text-center gap-5">
+              <div className="w-16 h-16 rounded-full bg-red-50 border border-red-100 flex items-center justify-center text-red-500 shadow-sm shrink-0 animate-bounce">
+                <XCircle className="h-8 w-8" />
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-red-600">Kredit Tidak Cukup</h3>
+                <p className="text-xs text-[#64748b] leading-relaxed max-w-xs">
+                  Transaksi tap souvenir ditolak karena sisa saldo wisatawan berada di bawah nominal yang diminta.
+                </p>
+              </div>
+
+              <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Nominal Diminta</span>
+                  <span className="font-extrabold text-red-600">{formatRupiah(creditErrorDetails.requested)}</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-200 pt-2">
+                  <span className="text-gray-400">Sisa Kredit Aktif</span>
+                  <span className="font-extrabold text-amber-600">{formatRupiah(creditErrorDetails.remaining)}</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-200 pt-2">
+                  <span className="text-gray-400">Batas Kredit Awal</span>
+                  <span className="font-extrabold text-slate-800">{formatRupiah(creditErrorDetails.limit)}</span>
+                </div>
+              </div>
+
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setActiveDrawer(null);
+                  setCreditErrorDetails(null);
+                }}
+                className="w-full text-xs font-bold mt-2"
+              >
+                Tutup
+              </Button>
+            </div>
+          )}
+        </Modal>
+
+        {/* F. SETTINGS CONFIGURATION DRAWER */}
+        <Modal
+          isOpen={activeDrawer === 'settings'}
+          onClose={() => setActiveDrawer(null)}
+          title="Setelan Terminal"
+        >
+          <div className="flex flex-col gap-5 text-left">
+            {/* Card Preset Nominal */}
+            {!isEntryGate && (
+              <div className="bg-white border border-[#e5e3db] rounded-3xl p-5 shadow-xs flex flex-col gap-4">
+                <h3 className="text-xs font-black uppercase tracking-wider text-[#1e293b] border-b border-[#e5e3db] pb-2">
+                  Preset Belanja Souvenir
+                </h3>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">
+                    Nominal Default Tap (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    value={defaultNominal}
+                    onChange={(e) => handleUpdateDefaultNominal(e.target.value)}
+                    className="w-full px-4 py-2.5 text-sm bg-white text-[#1D9E75] font-bold border border-[#e5e3db] rounded-xl outline-none focus:border-[#1D9E75]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Card Informasi Terminal */}
+            <div className="bg-white border border-[#e5e3db] rounded-3xl p-5 shadow-xs flex flex-col gap-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-[#1e293b] border-b border-[#e5e3db] pb-2">
+                Informasi Terminal
+              </h3>
+              <div className="space-y-2.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Terminal ID</span>
+                  <span className="font-mono font-bold text-[#1e293b] select-all">{merchant.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Nama Partner</span>
+                  <span className="font-bold text-[#1e293b]">{merchant.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Lokasi Pos</span>
+                  <span className="font-bold text-[#1e293b]">{merchant.location}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Kategori Merchant</span>
+                  <span className="font-bold text-[#1e293b]">{merchant.category}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Tipe Terminal</span>
+                  <Badge variant={merchant.merchant_type === 'loket' ? 'VIP' : 'Family'}>
+                    {merchant.merchant_type === 'loket' ? 'Loket Entry' : 'Regular Merchant'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+
+            {/* Mode Simulasi Toggle */}
+            {!isSupabaseConfigured && (
+              <div className="bg-white border border-[#e5e3db] rounded-3xl p-5 shadow-xs flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-[#1e293b]">
+                    Mode Simulasi
+                  </h3>
+                  <p className="text-[10px] text-gray-400 font-medium">
+                    Aktifkan emulator offline / local storage
+                  </p>
+                </div>
+                <button
+                  onClick={handleToggleSim}
+                  className={`w-11 h-6 rounded-full transition-all relative shrink-0 cursor-pointer ${
+                    simulationMode ? 'bg-[#1D9E75]' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`w-4.5 h-4.5 rounded-full bg-white absolute top-0.5 transition-all shadow-xs ${
+                      simulationMode ? 'left-5.5' : 'left-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            )}
+
+            {/* Card Akun */}
+            <div className="bg-white border border-[#e5e3db] rounded-3xl p-5 shadow-xs flex flex-col gap-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-[#1e293b] border-b border-[#e5e3db] pb-2">
+                Akun Petugas
+              </h3>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-400">Email</span>
+                <span className="font-bold text-[#1e293b] truncate max-w-[150px]">{user?.email}</span>
+              </div>
+              <Button
+                onClick={() => setShowLogoutConfirm(true)}
+                variant="danger"
+                size="sm"
+                className="w-full mt-2 font-bold flex items-center justify-center gap-2"
+              >
+                <LogOut className="h-4 w-4" /> Keluar Sesi
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* G. HISTORY LIST DRAWER */}
+        <Modal
+          isOpen={activeDrawer === 'history'}
+          onClose={() => setActiveDrawer(null)}
+          title="Riwayat Transaksi"
+        >
+          <div className="flex flex-col gap-5 text-left">
+            
+            {/* Summary metrics cards */}
+            <div className="grid grid-cols-2 gap-3.5">
+              <div className="col-span-2">
+                <StatCard
+                  label="Belanja Hari Ini"
+                  value={formatRupiah(historyStats.today.total)}
+                  subtext={`${historyStats.today.count} transaksi tap`}
+                  tone="green"
+                  icon={<Activity className="h-5 w-5" />}
+                />
+              </div>
+              <StatCard
+                label="Minggu Ini"
+                value={formatRupiah(historyStats.thisWeek.total)}
+                subtext={`${historyStats.thisWeek.count} taps`}
+                tone="blue"
+              />
+              <StatCard
+                label="Bulan Ini"
+                value={formatRupiah(historyStats.thisMonth.total)}
+                subtext={`${historyStats.thisMonth.count} taps`}
+                tone="amber"
+              />
+            </div>
+
+            {/* Filters Bar */}
+            <div className="bg-white border border-[#e5e3db] rounded-3xl p-4 flex flex-col gap-4 shadow-xs">
+              <div className="flex items-center justify-between border-b border-[#e5e3db] pb-3">
+                <h3 className="text-xs font-black uppercase tracking-wider text-[#1e293b]">
+                  Filter & Unduh
+                </h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => loadHistoryData(false)}
+                    disabled={historyFetchLoading || historyRefreshing}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-[#1e293b] hover:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${historyRefreshing ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button
+                    onClick={handleExportCSV}
+                    disabled={historyTxs.length === 0 || historyFetchLoading}
+                    className="flex items-center gap-1.5 text-[10px] font-bold bg-[#E1F5EE] text-[#1D9E75] hover:bg-[#cbeedf] px-2.5 py-1 rounded-full cursor-pointer disabled:opacity-50"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Export CSV
+                  </button>
+                </div>
+              </div>
+
+              {/* Filter selections */}
+              <div className="grid grid-cols-4 gap-1.5 text-[10px] font-bold">
+                {(['hari', 'minggu', 'bulan', 'custom'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setHistoryFilter(f)}
+                    className={`py-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                      historyFilter === f
+                        ? 'bg-[#1D9E75] border-[#1D9E75] text-white'
+                        : 'bg-[#f7f7f5] border-[#e5e3db] text-[#64748b] hover:bg-slate-100'
+                    }`}
+                  >
+                    {f === 'hari' ? 'Hari Ini' : f === 'minggu' ? '7 Hari' : f === 'bulan' ? '30 Hari' : 'Custom'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom Date pickers */}
+              {historyFilter === 'custom' && (
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-[#64748b] font-bold">DARI</span>
+                    <input
+                      type="date"
+                      value={customDateFrom}
+                      onChange={(e) => setCustomDateFrom(e.target.value)}
+                      className="p-2 border border-[#e5e3db] rounded-lg bg-[#f7f7f5] text-[#1e293b]"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-[#64748b] font-bold">SAMPAI</span>
+                    <input
+                      type="date"
+                      value={customDateTo}
+                      onChange={(e) => setCustomDateTo(e.target.value)}
+                      className="p-2 border border-[#e5e3db] rounded-lg bg-[#f7f7f5] text-[#1e293b]"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Recharts chart trend (not shown for 'hari' filter) */}
+            {historyFilter !== 'hari' && historyTxs.length > 0 && (
+              <div className="bg-white border border-[#e5e3db] rounded-3xl p-4 shadow-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748b] block mb-3">
+                  Tren Belanja Souvenir (Harian)
+                </span>
+                <div className="h-44 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ left: -25, right: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e3db" />
+                      <XAxis dataKey="date" fontSize={9} stroke="#64748b" />
+                      <YAxis fontSize={9} stroke="#64748b" tickFormatter={(v) => `Rp${v/1000}k`} />
+                      <Tooltip formatter={(v) => formatRupiah(Number(v))} contentStyle={{ fontSize: 10, borderRadius: 8 }} />
+                      <Bar dataKey="revenue" fill="#1D9E75" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Log lists */}
+            <div className="bg-white border border-[#e5e3db] rounded-3xl p-5 shadow-xs flex flex-col gap-3">
+              <span className="text-xs font-black uppercase tracking-wider text-[#1e293b]">
+                Daftar Transaksi
+              </span>
+
+              <div className="flex flex-col gap-3">
+                {historyFetchLoading && historyTxs.length === 0 ? (
+                  Array.from({ length: 5 }).map((_, idx) => (
+                    <div key={idx} className="flex items-center justify-between py-2 border-b border-[#f7f7f5] animate-pulse">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-full bg-slate-200" />
+                        <div className="space-y-1">
+                          <div className="h-3 w-24 bg-slate-200 rounded" />
+                          <div className="h-2.5 w-16 bg-slate-200 rounded" />
+                        </div>
+                      </div>
+                      <div className="h-3 w-16 bg-slate-200 rounded" />
+                    </div>
+                  ))
+                ) : historyTxs.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed border-[#e5e3db] rounded-2xl flex flex-col items-center justify-center gap-2">
+                    <History className="h-6 w-6 text-gray-300" />
+                    <p className="text-xs text-gray-400">Tidak ada riwayat tap ditemukan</p>
+                  </div>
+                ) : (
+                  historyTxs.map(tx => (
+                    <div
+                      key={tx.id}
+                      className="flex items-center justify-between py-2 border-b border-[#f7f7f5] text-xs"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8.5 h-8.5 rounded-full bg-slate-100 flex items-center justify-center font-extrabold text-[#1e293b] shrink-0 border border-slate-200">
+                          {(tx.visitor_name || 'Unknown').substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="text-left min-w-0">
+                          <p className="font-bold text-[#1e293b] truncate">{tx.visitor_name}</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {formatDatetime(tx.created_at)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className={`font-black ${tx.type === 'entry' ? 'text-blue-600' : 'text-red-600'}`}>
+                          {tx.type === 'entry' ? 'Entry' : `-${formatRupiah(tx.amount)}`}
+                        </span>
+                        <span className="text-[9px] font-bold text-green-600 block mt-0.5 bg-green-50 px-1 rounded-full border border-green-100 text-center">
+                          Synced
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {/* Load more */}
+                {historyTxs.length < historyTotalCount && (
+                  <button
+                    onClick={loadMoreHistory}
+                    disabled={historyFetchLoading}
+                    className="w-full text-center py-2.5 text-xs text-[#1D9E75] hover:text-[#168260] hover:bg-[#E1F5EE] rounded-xl border border-dashed border-[#1D9E75]/30 mt-2 font-bold cursor-pointer transition-colors"
+                  >
+                    {historyFetchLoading ? 'Memuat...' : `Tampilkan Lebih Banyak (${historyTxs.length} dari ${historyTotalCount})`}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </Modal>
+
+        {/* H. CONFIRM LOGOUT */}
+        <ConfirmDialog
+          isOpen={showLogoutConfirm}
+          onClose={() => setShowLogoutConfirm(false)}
+          onConfirm={() => {
+            signOut();
+            setShowLogoutConfirm(false);
+          }}
+          title="Konfirmasi Logout"
+          message="Yakin ingin keluar? Sesi terminal aktif Anda akan berakhir."
+          confirmLabel="Keluar"
+        />
+      </div>
+    </div>
+  );
+}
+
+
