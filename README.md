@@ -68,6 +68,10 @@ Jika masih dalam tahap awal dan seluruh data WAVR boleh dihapus:
 `reset.sql` tidak menghapus user Supabase Auth secara otomatis agar tidak
 menyentuh schema internal `auth`.
 
+Jika database dibuat sebelum kolom telepon merchant ditambahkan, jalankan
+[`migrations/20260613_add_merchant_phone.sql`](./migrations/20260613_add_merchant_phone.sql)
+sekali. Database baru yang memakai `schema.sql` terbaru tidak memerlukannya.
+
 ## Menjalankan Aplikasi
 
 ```bash

@@ -64,8 +64,12 @@ CREATE TABLE merchants (
   location TEXT NOT NULL,
   merchant_type TEXT NOT NULL DEFAULT 'regular' CHECK (merchant_type IN ('loket', 'regular')),
   owner_user_id TEXT,
+  phone TEXT,
   is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT merchant_phone_format CHECK (
+    phone IS NULL OR phone ~ '^(08|\+62)[0-9]{8,11}$'
+  )
 );
 
 -- =======================================================================

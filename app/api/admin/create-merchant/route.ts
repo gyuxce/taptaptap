@@ -78,7 +78,15 @@ export async function POST(req: NextRequest) {
         console.error('[create-merchant] merchant db error:', merchantError);
         // Rollback created user
         await supabaseAdmin.auth.admin.deleteUser(userId);
-        return NextResponse.json({ error: 'Gagal mendaftarkan merchant di database' }, { status: 500 });
+        const isMissingPhoneColumn =
+          merchantError?.code === 'PGRST204' &&
+          merchantError.message?.includes("'phone'");
+        return NextResponse.json({
+          error: isMissingPhoneColumn
+            ? 'Schema database belum terbaru: kolom merchants.phone belum tersedia'
+            : 'Gagal mendaftarkan merchant di database',
+          correlationId,
+        }, { status: 500 });
       }
 
       // Step C: Upsert into profiles table to prevent primary key collision from the trigger
