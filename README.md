@@ -55,6 +55,19 @@ INSERT INTO public.profiles (id, role, merchant_id, merchant_type)
 VALUES ('UUID_USER_ADMIN', 'admin', null, null);
 ```
 
+### Reset database kosong
+
+Jika masih dalam tahap awal dan seluruh data WAVR boleh dihapus:
+
+1. Jalankan [reset.sql](./reset.sql) sekali melalui Supabase SQL Editor.
+2. Jalankan [schema.sql](./schema.sql).
+3. Hapus user lama melalui menu **Authentication > Users** bila ingin akun
+   benar-benar dimulai dari nol.
+4. Buat kembali user admin, lalu tambahkan profil admin seperti query di atas.
+
+`reset.sql` tidak menghapus user Supabase Auth secara otomatis agar tidak
+menyentuh schema internal `auth`.
+
 ## Menjalankan Aplikasi
 
 ```bash
