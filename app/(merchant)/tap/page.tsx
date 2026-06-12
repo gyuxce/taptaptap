@@ -42,6 +42,10 @@ export default function MerchantTerminalPage() {
   const [activeDrawer, setActiveDrawer] = useState<'visitor' | 'error_unregistered' | 'double_tap' | 'credit_error' | 'register' | 'topup' | 'settings' | 'history' | null>(null);
   const [simulationMode, setSimulationMode] = useState<boolean>(true);
 
+  // NFC Abort Controllers Refs
+  const mainAbortControllerRef = useRef<AbortController | null>(null);
+  const topUpAbortControllerRef = useRef<AbortController | null>(null);
+
   // Settings Nominal Preset State
   const [defaultNominal, setDefaultNominal] = useState<number>(25000);
 
@@ -136,8 +140,12 @@ export default function MerchantTerminalPage() {
   // 2. Load simulation state from localstorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const storedSim = window.localStorage.getItem('ecotour_sim_mode');
-      setSimulationMode(storedSim !== 'false');
+      if (isSupabaseConfigured) {
+        setSimulationMode(false);
+      } else {
+        const storedSim = window.localStorage.getItem('ecotour_sim_mode');
+        setSimulationMode(storedSim !== 'false');
+      }
 
       const storedNominal = window.localStorage.getItem('ecotour_default_nominal');
       if (storedNominal) {
@@ -152,7 +160,41 @@ export default function MerchantTerminalPage() {
   useEffect(() => {
     setIsScanning(false);
     setIsTopUpScanning(false);
+
+    // Abort active NFC scans immediately to prevent conflicts
+    if (mainAbortControllerRef.current) {
+      try {
+        mainAbortControllerRef.current.abort();
+      } catch (e) {
+        // ignore abort error
+      }
+      mainAbortControllerRef.current = null;
+    }
+    if (topUpAbortControllerRef.current) {
+      try {
+        topUpAbortControllerRef.current.abort();
+      } catch (e) {
+        // ignore abort error
+      }
+      topUpAbortControllerRef.current = null;
+    }
   }, [activeDrawer]);
+
+  // Cleanup scanning on unmount
+  useEffect(() => {
+    return () => {
+      if (mainAbortControllerRef.current) {
+        try {
+          mainAbortControllerRef.current.abort();
+        } catch (e) {}
+      }
+      if (topUpAbortControllerRef.current) {
+        try {
+          topUpAbortControllerRef.current.abort();
+        } catch (e) {}
+      }
+    };
+  }, []);
 
   const loadMerchantAndConfig = async (userId: string) => {
     setTerminalLoading(true);
@@ -337,7 +379,6 @@ export default function MerchantTerminalPage() {
     }
   }, [defaultNominal]);
 
-  // 5. NDEFReader scan trigger
   const triggerNFCScan = useCallback(async () => {
     if (typeof window === 'undefined') return;
     if (!('NDEFReader' in window)) {
@@ -346,6 +387,12 @@ export default function MerchantTerminalPage() {
     }
 
     if (isScanning) {
+      if (mainAbortControllerRef.current) {
+        try {
+          mainAbortControllerRef.current.abort();
+        } catch (e) {}
+        mainAbortControllerRef.current = null;
+      }
       setIsScanning(false);
       return;
     }
@@ -353,16 +400,28 @@ export default function MerchantTerminalPage() {
     setIsScanning(true);
     setNfcError(null);
     try {
+      if (mainAbortControllerRef.current) {
+        try {
+          mainAbortControllerRef.current.abort();
+        } catch (e) {}
+      }
+      const controller = new AbortController();
+      mainAbortControllerRef.current = controller;
+
       const ndef = new (window as any).NDEFReader();
-      await ndef.scan();
+      await ndef.scan({ signal: controller.signal });
       ndef.onreading = (event: any) => {
         const normalized = normalizeUID(event.serialNumber);
         processScannedRFID(normalized);
+      };
+      ndef.onreadingerror = () => {
+        toast.error('Gagal membaca tag NFC. Silakan coba lagi.');
       };
     } catch (err: any) {
       console.error(err);
       setNfcError('Gagal mendeteksi sensor: ' + (err.message || err));
       setIsScanning(false);
+      mainAbortControllerRef.current = null;
     }
   }, [isScanning, processScannedRFID]);
 
@@ -409,6 +468,12 @@ export default function MerchantTerminalPage() {
     }
 
     if (isTopUpScanning) {
+      if (topUpAbortControllerRef.current) {
+        try {
+          topUpAbortControllerRef.current.abort();
+        } catch (e) {}
+        topUpAbortControllerRef.current = null;
+      }
       setIsTopUpScanning(false);
       return;
     }
@@ -416,16 +481,28 @@ export default function MerchantTerminalPage() {
     setIsTopUpScanning(true);
     setTopUpNfcError(null);
     try {
+      if (topUpAbortControllerRef.current) {
+        try {
+          topUpAbortControllerRef.current.abort();
+        } catch (e) {}
+      }
+      const controller = new AbortController();
+      topUpAbortControllerRef.current = controller;
+
       const ndef = new (window as any).NDEFReader();
-      await ndef.scan();
+      await ndef.scan({ signal: controller.signal });
       ndef.onreading = (event: any) => {
         const normalized = normalizeUID(event.serialNumber);
         processTopUpRFID(normalized);
+      };
+      ndef.onreadingerror = () => {
+        toast.error('Gagal membaca tag NFC. Silakan coba lagi.');
       };
     } catch (err: any) {
       console.error(err);
       setTopUpNfcError('Gagal mendeteksi sensor: ' + (err.message || err));
       setIsTopUpScanning(false);
+      topUpAbortControllerRef.current = null;
     }
   }, [isTopUpScanning, processTopUpRFID]);
 

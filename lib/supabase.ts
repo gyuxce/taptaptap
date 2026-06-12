@@ -23,35 +23,7 @@ function generateRFIDUID(): string {
   return uid;
 }
 
-// Preloaded Mock Data
-const MOCK_MERCHANTS: Merchant[] = [
-  { id: 'm-lok1', name: 'Loket Utama Barat (Entry)', category: 'Loket/Gerbang', location: 'Gerbang Barat Area A', merchant_type: 'loket', owner_user_id: 'u-lok1', phone: '081234567890', is_active: true, created_at: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString() },
-  { id: 'm-lok2', name: 'Loket Utama Timur (Entry)', category: 'Loket/Gerbang', location: 'Gerbang Timur Area C', merchant_type: 'loket', owner_user_id: 'u-lok2', phone: '081234567890', is_active: true, created_at: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString() },
-  { id: 'm-adv1', name: 'Zipline Canopy Canopy', category: 'Adventure', location: 'Lembah Pinus Area B', merchant_type: 'regular', owner_user_id: 'u-adv1', phone: '081234567890', is_active: true, created_at: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString() },
-  { id: 'm-adv2', name: 'Rafting Sungai Citarum', category: 'Adventure', location: 'Dermaga Sungai Area A', merchant_type: 'regular', owner_user_id: 'u-adv2', phone: '081234567890', is_active: true, created_at: new Date(Date.now() - 28 * 24 * 3600 * 1000).toISOString() },
-  { id: 'm-fb1', name: 'Warung Kopi Pinus', category: 'F&B', location: 'Puncak Pinus Area B', merchant_type: 'regular', owner_user_id: 'u-fb1', phone: '081234567890', is_active: true, created_at: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString() },
-  { id: 'm-fb2', name: 'Resto Sunda EcoGreen', category: 'F&B', location: 'Food Court Utama', merchant_type: 'regular', owner_user_id: 'u-fb2', phone: '081234567890', is_active: true, created_at: new Date(Date.now() - 29 * 24 * 3600 * 1000).toISOString() },
-  { id: 'm-ret1', name: 'EcoCraft Souvenir & Kaos', category: 'Retail', location: 'Plaza Belanja Utama', merchant_type: 'regular', owner_user_id: 'u-ret1', phone: '081234567890', is_active: true, created_at: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString() },
-  { id: 'm-ret2', name: 'Oleh-oleh Keripik & Madu', category: 'Retail', location: 'Plaza Belanja Kios #5', merchant_type: 'regular', owner_user_id: 'u-ret2', phone: '081234567890', is_active: true, created_at: new Date(Date.now() - 27 * 24 * 3600 * 1000).toISOString() },
-  { id: 'm-sight1', name: 'Gardu Pandang Gunung Indah', category: 'Sightseeing', location: 'Puncak Bukit Area D', merchant_type: 'regular', owner_user_id: 'u-sight1', phone: '081234567890', is_active: true, created_at: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString() },
-];
-
-// Add auto-generated merchants to reach 50+ scale
-for (let i = 10; i <= 52; i++) {
-  const categories = ['Adventure', 'F&B', 'Retail', 'Sightseeing'] as const;
-  const category = categories[i % categories.length];
-  MOCK_MERCHANTS.push({
-    id: `m-gen${i}`,
-    name: `${category} Merchant #${i}`,
-    category: category,
-    location: `Lokasi Kios #${i} Area ${String.fromCharCode(65 + (i % 4))}`,
-    merchant_type: 'regular',
-    owner_user_id: `u-gen${i}`,
-    phone: `081234567890`,
-    is_active: true,
-    created_at: new Date(Date.now() - (30 - (i % 20)) * 24 * 3600 * 1000).toISOString(),
-  });
-}
+const MOCK_MERCHANTS: Merchant[] = [];
 const MOCK_VISITORS: Visitor[] = [];
 const MOCK_RFID_TAGS: RFIDTag[] = [];
 const MOCK_TRANSACTIONS: Transaction[] = [];
