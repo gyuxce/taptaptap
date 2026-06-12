@@ -1,4 +1,4 @@
--- EcoTour Tap System - Supabase Schema
+-- WAVR - Supabase Schema
 -- Skala Produksi (50+ Merchant)
 
 -- Drop existing resources if resetting
