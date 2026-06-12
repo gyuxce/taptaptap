@@ -59,20 +59,19 @@ export async function POST(req: NextRequest) {
 
       const userId = userData.user.id;
 
-      // Step B: Insert into merchants table
-      const { data: merchantData, error: merchantError } = await supabaseAdmin
-        .from('merchants')
-        .insert({
-          name,
-          category,
-          location,
-          merchant_type,
-          owner_user_id: userId,
-          phone,
-          is_active: true
-        })
-        .select()
-        .single();
+      // Step B: Insert merchant, update profile, and write audit in one DB transaction.
+      const { data: provisionedMerchants, error: merchantError } = await supabaseAdmin
+        .rpc('finalize_merchant_provisioning', {
+          p_user_id: userId,
+          p_actor_user_id: adminProfile.id,
+          p_name: name,
+          p_category: category,
+          p_location: location,
+          p_merchant_type: merchant_type,
+          p_phone: phone,
+          p_owner_email: owner_email,
+        });
+      const merchantData = provisionedMerchants?.[0];
 
       if (merchantError || !merchantData) {
         console.error('[create-merchant] merchant db error:', merchantError);
@@ -81,43 +80,17 @@ export async function POST(req: NextRequest) {
         const isMissingPhoneColumn =
           merchantError?.code === 'PGRST204' &&
           merchantError.message?.includes("'phone'");
+        const isMissingProvisioningFunction =
+          merchantError?.code === 'PGRST202' ||
+          merchantError?.message?.includes('finalize_merchant_provisioning');
         return NextResponse.json({
           error: isMissingPhoneColumn
             ? 'Schema database belum terbaru: kolom merchants.phone belum tersedia'
-            : 'Gagal mendaftarkan merchant di database',
+            : isMissingProvisioningFunction
+              ? 'Jalankan migration optimasi provisioning merchant di Supabase'
+              : 'Gagal mendaftarkan merchant di database',
           correlationId,
         }, { status: 500 });
-      }
-
-      // Step C: Upsert into profiles table to prevent primary key collision from the trigger
-      const { error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .upsert({
-          id: userId,
-          role: 'merchant',
-          merchant_id: merchantData.id,
-          merchant_type: merchant_type
-        }, { onConflict: 'id' });
-
-      if (profileError) {
-        console.error('[create-merchant] profile db error:', profileError);
-        // Rollback created user and merchant
-        await supabaseAdmin.from('merchants').delete().eq('id', merchantData.id);
-        await supabaseAdmin.auth.admin.deleteUser(userId);
-        return NextResponse.json({ error: 'Gagal membuat profil user merchant' }, { status: 500 });
-      }
-
-      // Step D: Write log to audit trail
-      const { error: auditError } = await supabaseAdmin
-        .from('audit_log')
-        .insert({
-          action: 'create_merchant',
-          actor_user_id: adminProfile.id,
-          target_id: merchantData.id,
-          metadata: { name, category, location, phone, owner_email }
-        });
-      if (auditError) {
-        console.warn('[create-merchant] failed to log audit:', auditError);
       }
 
       return NextResponse.json({

@@ -72,6 +72,10 @@ Jika database dibuat sebelum kolom telepon merchant ditambahkan, jalankan
 [`migrations/20260613_add_merchant_phone.sql`](./migrations/20260613_add_merchant_phone.sql)
 sekali. Database baru yang memakai `schema.sql` terbaru tidak memerlukannya.
 
+Untuk mempercepat pembuatan merchant pada database yang sudah berjalan,
+jalankan [`migrations/20260613_optimize_merchant_provisioning.sql`](./migrations/20260613_optimize_merchant_provisioning.sql)
+sekali.
+
 ## Menjalankan Aplikasi
 
 ```bash

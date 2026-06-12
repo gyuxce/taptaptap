@@ -173,6 +173,10 @@ export default function AdminMerchantsPage() {
             });
             const resJson = await res.json();
             if (resJson.success) {
+                setMerchants(current => [
+                    resJson.merchant as Merchant,
+                    ...current.filter(item => item.id !== resJson.merchant.id),
+                ]);
                 setGeneratedCredentials({
                     email: data.owner_email,
                     pass: data.owner_password,
@@ -180,7 +184,6 @@ export default function AdminMerchantsPage() {
                 });
                 setIsCreateModalOpen(false);
                 reset();
-                await loadMerchants();
             }
             else {
                 toast.error(resJson.error || 'Gagal membuat merchant');
