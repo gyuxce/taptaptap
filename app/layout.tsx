@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   title: "WAVR — One Wave, Endless Experience",
   description: "WAVR adalah sistem tap NFC untuk wisata dan event. Cashless, real-time, effortless.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.svg",
+  },
   openGraph: {
     title: "WAVR",
     description: "One Wave, Endless Experience",
