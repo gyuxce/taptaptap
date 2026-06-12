@@ -6,6 +6,7 @@ export interface SilentMerchant {
   name: string;
   location: string;
   category: string;
+  phone?: string | null;
   hours_since_last_activity: number;
 }
 
@@ -70,6 +71,7 @@ export async function checkMerchantActivity(): Promise<SilentMerchant[]> {
           name: merch.name,
           location: merch.location,
           category: merch.category,
+          phone: merch.phone || null,
           hours_since_last_activity: parseFloat((diffMs / (60 * 60 * 1000)).toFixed(1))
         });
       }

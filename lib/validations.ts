@@ -22,6 +22,7 @@ export const createMerchantSchema = z.object({
   category: z.enum(['Adventure', 'F&B', 'Retail', 'Sightseeing', 'Loket/Gerbang']),
   location: z.string().min(3, 'Lokasi minimal 3 karakter').max(200),
   merchant_type: z.enum(['loket', 'regular']),
+  phone: z.string().regex(/^(08|\+62)[0-9]{8,11}$/, 'Format nomor HP tidak valid (mulai 08 atau +62)'),
   owner_email: z.string().email('Email tidak valid'),
   owner_password: z.string().min(8, 'Password minimal 8 karakter')
 });

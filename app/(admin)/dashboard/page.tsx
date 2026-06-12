@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '@/lib/supabase';
 import { Visitor, Merchant, Transaction } from '@/types';
-import { formatRupiah, formatDatetime } from '@/lib/utils';
+import { formatRupiah, formatDatetime, formatPhoneForWA } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard } from '@/components/ui/StatCard';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line } from 'recharts';
@@ -239,7 +239,7 @@ export default function AdminDashboardPage() {
               {silentMerchants.slice(0, 5).map(m => (
                 <a
                   key={m.id}
-                  href={`https://wa.me/6281234567890?text=Halo%20${encodeURIComponent(m.name)}%20Partner%20EcoTour.%20Sistem%20mendeteksi%20belum%20ada%20aktivitas%20tap%20selama%202%20jam%20terakhir.%20Apakah%20ada%20kendala%20alat%20tap%3F`}
+                  href={`https://wa.me/${formatPhoneForWA(m.phone) || '6281234567890'}?text=Halo%20${encodeURIComponent(m.name)}%20Partner%20EcoTour.%20Sistem%20mendeteksi%20belum%20ada%20aktivitas%20tap%20selama%202%20jam%20terakhir.%20Apakah%20ada%20kendala%20alat%20tap%3F`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[9px] font-extrabold transition-all shadow-xs flex items-center gap-1 cursor-pointer"

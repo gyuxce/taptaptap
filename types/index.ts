@@ -33,6 +33,7 @@ export interface Merchant {
   location: string
   merchant_type: 'loket' | 'regular'
   owner_user_id: string | null
+  phone?: string | null
   is_active: boolean
   created_at: string
 }

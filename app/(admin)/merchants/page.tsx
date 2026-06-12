@@ -54,6 +54,7 @@ export default function AdminMerchantsPage() {
       category: 'F&B',
       location: '',
       merchant_type: 'regular',
+      phone: '',
       owner_email: '',
       owner_password: 'EcoTour2025!',
     }
@@ -337,6 +338,14 @@ export default function AdminMerchantsPage() {
             error={errors.owner_email?.message}
             disabled={isSubmitting}
             {...register('owner_email')}
+          />
+
+          <Input
+            label="Nomor HP Owner (WhatsApp) *"
+            placeholder="Contoh: 081234567890"
+            error={errors.phone?.message}
+            disabled={isSubmitting}
+            {...register('phone')}
           />
 
           <div className="relative">

@@ -84,3 +84,12 @@ export function getTicketColor(type: string): string {
       return 'bg-gray-100 text-gray-700 border-gray-200';
   }
 }
+
+export function formatPhoneForWA(phone: string | null | undefined): string {
+  if (!phone) return '';
+  let cleaned = phone.replace(/\D/g, '');
+  if (cleaned.startsWith('0')) {
+    cleaned = '62' + cleaned.substring(1);
+  }
+  return cleaned;
+}

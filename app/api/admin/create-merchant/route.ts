@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: validation.error.issues[0]?.message || 'Validasi formulir gagal' }, { status: 400 });
     }
 
-    const { name, category, location, merchant_type, owner_email, owner_password } = validation.data;
+    const { name, category, location, merchant_type, phone, owner_email, owner_password } = validation.data;
 
     // 3. Database operations
     if (isSupabaseAdminConfigured) {
@@ -72,6 +72,7 @@ export async function POST(req: Request) {
           location,
           merchant_type,
           owner_user_id: userId,
+          phone,
           is_active: true
         })
         .select()
@@ -109,7 +110,7 @@ export async function POST(req: Request) {
           action: 'create_merchant',
           actor_user_id: adminProfile.id,
           target_id: merchantData.id,
-          metadata: { name, category, location, owner_email }
+          metadata: { name, category, location, phone, owner_email }
         });
       if (auditError) {
         console.warn('[create-merchant] failed to log audit:', auditError);

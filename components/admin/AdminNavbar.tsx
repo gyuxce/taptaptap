@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Shield, Bell, Menu } from 'lucide-react';
 import { checkMerchantActivity, SilentMerchant } from '@/lib/services/alertService';
+import { formatPhoneForWA } from '@/lib/utils';
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -121,7 +122,7 @@ export const AdminNavbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                         Belum ada aktivitas transaksi terdeteksi di {alert.location}.
                       </p>
                       <a
-                        href={`https://wa.me/6281234567890?text=Halo%20${encodeURIComponent(alert.name)}%20Partner%20EcoTour.%20Sistem%20mendeteksi%20belum%20ada%20aktivitas%20tap%20selama%20${alert.hours_since_last_activity}%20jam%20terakhir.%20Apakah%20ada%20kendala%20alat%20tap%3F`}
+                        href={`https://wa.me/${formatPhoneForWA(alert.phone) || '6281234567890'}?text=Halo%20${encodeURIComponent(alert.name)}%20Partner%20EcoTour.%20Sistem%20mendeteksi%20belum%20ada%20aktivitas%20tap%20selama%20${alert.hours_since_last_activity}%20jam%20terakhir.%20Apakah%20ada%20kendala%20alat%20tap%3F`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-full py-1.5 bg-[#1D9E75] hover:bg-[#157959] text-white text-[10px] font-extrabold rounded-lg text-center transition-colors shadow-xs"
