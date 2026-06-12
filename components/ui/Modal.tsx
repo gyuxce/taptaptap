@@ -25,7 +25,7 @@ export const Modal: React.FC<ModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-[#1e293b]/40 backdrop-blur-xs"
+            className="fixed inset-0 bg-[#1e293b]/45"
           />
 
           {/* Modal Container */}
@@ -49,10 +49,11 @@ export const Modal: React.FC<ModalProps> = ({
               desktop: { y: 0, opacity: 1, scale: 1 },
               mobile: { y: 0, opacity: 1 }
             }}
-            transition={{ type: 'spring', damping: 26, stiffness: 290 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
             className="relative w-full md:max-w-lg bg-[#f7f7f5] border-t md:border border-[#e5e3db] rounded-t-3xl md:rounded-2xl shadow-2xl z-10 flex flex-col max-h-[92vh] md:max-h-[85vh] overflow-hidden md:animate-none"
             style={{
-              transformOrigin: 'bottom center'
+              transformOrigin: 'bottom center',
+              willChange: 'transform, opacity'
             }}
           >
             {/* Mobile Drag Indicator Bar */}

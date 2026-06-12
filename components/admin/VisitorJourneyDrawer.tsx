@@ -106,7 +106,7 @@ export const VisitorJourneyDrawer: React.FC<VisitorJourneyDrawerProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs"
+            className="fixed inset-0 bg-slate-900/45"
           />
 
           {/* Drawer Panel */}
@@ -114,8 +114,9 @@ export const VisitorJourneyDrawer: React.FC<VisitorJourneyDrawerProps> = ({
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
             className="relative w-full sm:w-[400px] bg-[#f7f7f5] border-l border-[#e5e3db] shadow-2xl z-10 flex flex-col h-full overflow-hidden"
+            style={{ willChange: 'transform' }}
           >
             {/* Header */}
             <div className="p-5 bg-white border-b border-[#e5e3db] flex flex-col gap-4">

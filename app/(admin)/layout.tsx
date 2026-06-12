@@ -49,15 +49,16 @@ export default function AdminLayout({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsMobileSidebarOpen(false)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-xs"
+              className="fixed inset-0 bg-black/45"
             />
             {/* Slide menu */}
             <motion.div
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
               className="relative z-10 flex flex-col h-full bg-slate-900"
+              style={{ willChange: 'transform' }}
             >
               <AdminSidebar onCloseMobile={() => setIsMobileSidebarOpen(false)} />
             </motion.div>

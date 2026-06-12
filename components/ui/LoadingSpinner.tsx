@@ -30,7 +30,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#f7f7f5]/90 backdrop-blur-xs gap-3 select-none">
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#f7f7f5]/95 gap-3 select-none">
         {spinnerElement}
         <span className="text-xs font-semibold text-[#64748b] tracking-wider uppercase">
           Menghubungkan ke Sistem...
