@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '@/lib/auth';
-import { isSupabaseConfigured, db } from '@/lib/supabase';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { registerVisitorSchema, RegisterVisitorInput } from '@/lib/validations';
 import { fetchVisitorByUID, registerVisitor, checkCredit, deductCredit, topUpCredit } from '@/lib/services/visitorService';
 import { logTransaction, fetchTransactions, fetchTransactionStats } from '@/lib/services/transactionService';
@@ -41,7 +41,7 @@ export default function MerchantTerminalPage() {
   const [merchant, setMerchant] = useState<Merchant | null>(null);
   const [terminalLoading, setTerminalLoading] = useState(true);
   const [activeDrawer, setActiveDrawer] = useState<'visitor' | 'error_unregistered' | 'double_tap' | 'credit_error' | 'register' | 'topup' | 'settings' | 'history' | null>(null);
-  const [simulationMode, setSimulationMode] = useState<boolean>(true);
+  const simulationMode = false;
 
   // NFC Abort Controllers Refs
   const mainAbortControllerRef = useRef<AbortController | null>(null);
@@ -55,7 +55,6 @@ export default function MerchantTerminalPage() {
   const [nfcError, setNfcError] = useState<string | null>(null);
   const [httpsWarning, setHttpsWarning] = useState(false);
   const [tapScenarioLoading, setTapScenarioLoading] = useState(false);
-  const [isDemoRunning, setIsDemoRunning] = useState(false);
 
   // Double Tap Prevention Ref
   const lastScansRef = useRef<{ [uid: string]: number }>({});
@@ -120,8 +119,7 @@ export default function MerchantTerminalPage() {
   // Dialog Confirmations
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  // Offline Mode Visitors for grid emulation
-  const [offlineVisitors, setOfflineVisitors] = useState<{ visitor: Visitor; tag: RFIDTag }[]>([]);
+
 
   // 1. Auth check
   useEffect(() => {
@@ -138,16 +136,9 @@ export default function MerchantTerminalPage() {
     }
   }, [user, profile, authLoading]);
 
-  // 2. Load simulation state from localstorage
+  // 2. Load nominal defaults from localstorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      if (isSupabaseConfigured) {
-        setSimulationMode(false);
-      } else {
-        const storedSim = window.localStorage.getItem('ecotour_sim_mode');
-        setSimulationMode(storedSim !== 'false');
-      }
-
       const storedNominal = window.localStorage.getItem('ecotour_default_nominal');
       if (storedNominal) {
         const parsed = Number(storedNominal);
@@ -203,16 +194,7 @@ export default function MerchantTerminalPage() {
       const mData = await getMerchantByUserId(userId);
       setMerchant(mData);
       
-      // Load offline emulator visitors
-      if (typeof window !== 'undefined') {
-        const visList = await db.getVisitors();
-        const tagsList = await db.getRFIDTags();
-        const paired = visList.map(v => {
-          const t = tagsList.find(tag => tag.visitor_id === v.id && tag.is_active);
-          return t ? { visitor: v, tag: t } : null;
-        }).filter(item => item !== null) as { visitor: Visitor; tag: RFIDTag }[];
-        setOfflineVisitors(paired);
-      }
+
 
       // Check protocol warnings
       if (typeof window !== 'undefined') {
@@ -507,26 +489,6 @@ export default function MerchantTerminalPage() {
     }
   }, [isTopUpScanning, processTopUpRFID]);
 
-  const handleSimulateTopUpScan = async () => {
-    if (topUpScanLoading) return;
-    try {
-      const visList = await db.getVisitors();
-      const tagsList = await db.getRFIDTags();
-      const activePaired = visList.map(v => {
-        const t = tagsList.find(tag => tag.visitor_id === v.id && tag.is_active);
-        return t ? { visitor: v, tag: t } : null;
-      }).filter(item => item !== null) as { visitor: Visitor; tag: RFIDTag }[];
-
-      if (activePaired.length > 0) {
-        processTopUpRFID(activePaired[0].tag.uid);
-      } else {
-        toast.error('Tidak ada gelang terdaftar. Silakan ke Tab Daftar terlebih dahulu.');
-      }
-    } catch (err) {
-      toast.error('Gagal mengambil data simulator');
-    }
-  };
-
   const handleConfirmTopUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topUpVisitor || !topUpTag || !merchant) return;
@@ -542,22 +504,6 @@ export default function MerchantTerminalPage() {
       const res = await topUpCredit(topUpTag.uid, cleanAmount, merchant.id, topUpNote || undefined);
 
       if (res.success) {
-        const updatedLimit = Number(topUpVisitor.credit_limit) + Number(cleanAmount);
-        
-        if (!isSupabaseConfigured) {
-          setOfflineVisitors(prev => prev.map(item => {
-            if (item.visitor.id === topUpVisitor.id) {
-              return {
-                ...item,
-                visitor: {
-                  ...item.visitor,
-                  credit_limit: updatedLimit
-                }
-              };
-            }
-            return item;
-          }));
-        }
 
         setTopUpSuccessAmount(cleanAmount);
         setTopUpSuccessVisitorName(topUpVisitor.name);
@@ -657,72 +603,8 @@ export default function MerchantTerminalPage() {
     }
   }, [merchant, scannedUID, paymentAmount, selectedVisitor]);
 
-  // 7. Scenarios simulator
-  const runSimulatorScenario = async (type: 'VIP' | 'Regular' | 'ASING/BARU' | 'NONAKTIF' | 'KREDIT HABIS' | 'DOUBLE TAP') => {
-    if (tapScenarioLoading || isDemoRunning) return;
-    
-    // Scenarios mappings
-    const uids = {
-      VIP: 'E280113C200078AC', // Ahmad Faisal
-      Regular: 'E280113C200078AD', // Siti Rahmawati
-      'ASING/BARU': 'B1D3A9C8D72E15BF',
-      NONAKTIF: 'E280113C200078AE', // Dewi Lestari (let's set tag state inactive dynamically for demo)
-      'KREDIT HABIS': 'E280113C200078AF', // Budi (limit = 0? Wait, Budi limit 0. Eko Santoso limit 100k, used 25k. We can use a custom one)
-    };
 
-    if (type === 'NONAKTIF') {
-      // Toggle inactive temporarily in localStorage
-      const tags = await db.getRFIDTags();
-      const match = tags.find(t => t.uid === uids.NONAKTIF);
-      if (match) {
-        match.is_active = false;
-        window.localStorage.setItem('ecotour_rfid_tags', JSON.stringify(tags));
-      }
-    }
-
-    if (type === 'KREDIT HABIS') {
-      // Set limit low, credit used high for regular visitor Siti
-      const visitors = await db.getVisitors();
-      const match = visitors.find(v => v.id === 'v-2');
-      if (match) {
-        match.credit_limit = 10000;
-        match.credit_used = 10000; // 0 remaining
-        window.localStorage.setItem('ecotour_visitors', JSON.stringify(visitors));
-      }
-      processScannedRFID(uids.Regular);
-      return;
-    }
-
-    if (type === 'DOUBLE TAP') {
-      // We scan Sit's tag first
-      processScannedRFID(uids.Regular);
-      // Force lastScan timestamp to simulate tap inside 10 seconds
-      setTimeout(() => {
-        processScannedRFID(uids.Regular);
-      }, 500);
-      return;
-    }
-
-    const targetUID = type === 'ASING/BARU' ? uids['ASING/BARU'] : uids[type as keyof typeof uids];
-    processScannedRFID(targetUID);
-  };
-
-  // Run automated sequence loops
-  const runAutoDemo = async () => {
-    if (isDemoRunning) return;
-    setIsDemoRunning(true);
-    toast.info('Memulai demo tapping otomatis...');
-
-    const demoScenarios = ['VIP', 'Regular', 'ASING/BARU', 'KREDIT HABIS'] as const;
-    for (let i = 0; i < demoScenarios.length; i++) {
-      if (!isDemoRunning) break;
-      await new Promise(r => setTimeout(r, 2000));
-      toast.info(`Simulasi tap: ${demoScenarios[i]}`);
-      await runSimulatorScenario(demoScenarios[i]);
-    }
-    setIsDemoRunning(false);
-    toast.success('Demo otomatis selesai.');
-  };
+  // 7. (Simulator removed — real NFC only)
 
   // 8. Register Tab State hooks
   const {
@@ -768,17 +650,7 @@ export default function MerchantTerminalPage() {
     }
   };
 
-  const handleSimulateNewChip = () => {
-    const chars = '0123456789ABCDEF';
-    let uid = '';
-    for (let i = 0; i < 16; i++) {
-      uid += chars[Math.floor(Math.random() * 16)];
-    }
-    setNewTagUID(uid);
-    setNewTagError(null);
-    setRegisterStep(2);
-    toast.success('RFID Chip terdeteksi: ' + uid);
-  };
+
 
   // 9. Export to CSV file
   const handleExportCSV = () => {
@@ -807,15 +679,6 @@ export default function MerchantTerminalPage() {
   };
 
   // 10. Settings Configuration handlers
-  const handleToggleSim = () => {
-    const nextVal = !simulationMode;
-    setSimulationMode(nextVal);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('ecotour_sim_mode', nextVal.toString());
-      toast.success(nextVal ? 'Mode simulasi diaktifkan' : 'Mode live database aktif');
-    }
-  };
-
   const handleUpdateDefaultNominal = (val: string) => {
     const num = Number(val);
     if (!isNaN(num) && num >= 0) {
@@ -897,7 +760,7 @@ export default function MerchantTerminalPage() {
       return 'bg-[#f5f3ff]'; // register mode
     }
     if (activeDrawer === 'topup') {
-      return 'bg-[#eff6ff]'; // top up mode
+      return 'bg-[#E8F6FD]'; // top up mode
     }
     if (isScanning) {
       return 'bg-[#f0fdf4]'; // scanning active
@@ -959,18 +822,18 @@ export default function MerchantTerminalPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#eff6ff] z-50 flex flex-col items-center justify-center gap-4 text-center p-6"
+              className="absolute inset-0 bg-[#E8F6FD] z-50 flex flex-col items-center justify-center gap-4 text-center p-6"
             >
               <motion.div
                 initial={{ scale: 0.3, rotate: -45 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: 'spring', damping: 12 }}
-                className="w-24 h-24 rounded-full bg-[#2563EB] flex items-center justify-center text-white shadow-lg"
+                className="w-24 h-24 rounded-full bg-[#29ABE2] flex items-center justify-center text-white shadow-lg"
               >
                 <CheckCircle2 className="h-12 w-12" />
               </motion.div>
               <div className="space-y-1">
-                <h3 className="text-lg font-black text-[#2563EB] uppercase tracking-wide">
+                <h3 className="text-lg font-black text-[#29ABE2] uppercase tracking-wide">
                   Top Up Berhasil!
                 </h3>
                 <p className="text-sm font-bold text-[#1e293b]">
@@ -981,7 +844,7 @@ export default function MerchantTerminalPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setTopUpSuccessFlash(false)}
-                className="mt-6 text-xs font-bold text-blue-700 underline cursor-pointer"
+                className="mt-6 text-xs font-bold text-[#29ABE2] underline cursor-pointer"
               >
                 Selesai
               </Button>
@@ -1036,12 +899,7 @@ export default function MerchantTerminalPage() {
           </div>
         </div>
 
-        {/* 2. Simulation Banner */}
-        {simulationMode && (
-          <div className="bg-amber-500 text-white text-[10px] font-extrabold uppercase tracking-widest text-center py-1.5 shrink-0 z-20">
-            ● Mode Demo Aktif
-          </div>
-        )}
+
 
         {/* 3. Main Content Area */}
         <div className="flex-1 flex flex-col justify-between p-4 overflow-hidden">
@@ -1085,62 +943,7 @@ export default function MerchantTerminalPage() {
             )}
           </div>
 
-          {/* SIMULATOR GRID SCENARIOS (Compact size) */}
-          {simulationMode && (
-            <div className="my-2 bg-white/70 border border-[#e5e3db] rounded-2xl p-3 text-left shrink-0">
-              <div className="flex items-center justify-between border-b border-[#e5e3db]/60 pb-1.5 mb-1.5">
-                <span className="text-[9px] font-black uppercase tracking-wider text-amber-600 flex items-center gap-1">
-                  <Zap className="h-3 w-3" /> Gelang Simulator
-                </span>
-                <button
-                  onClick={runAutoDemo}
-                  disabled={isDemoRunning}
-                  className="text-[9px] font-bold bg-[#E8F6FD] text-[#29ABE2] px-2.5 py-0.5 rounded-full cursor-pointer hover:bg-[#D5EEFC] disabled:opacity-50"
-                >
-                  {isDemoRunning ? 'Menjalankan...' : 'Demo Otomatis'}
-                </button>
-              </div>
 
-              <div className="grid grid-cols-3 gap-1.5 text-[9px] font-bold">
-                <button
-                  onClick={() => runSimulatorScenario('VIP')}
-                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-[#E8F6FD] rounded-lg text-center text-[#1e293b] cursor-pointer"
-                >
-                  VIP
-                </button>
-                <button
-                  onClick={() => runSimulatorScenario('Regular')}
-                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-[#E8F6FD] rounded-lg text-center text-[#1e293b] cursor-pointer"
-                >
-                  Reguler
-                </button>
-                <button
-                  onClick={() => runSimulatorScenario('ASING/BARU')}
-                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-purple-50 rounded-lg text-center text-[#7C3AED] cursor-pointer"
-                >
-                  Asing
-                </button>
-                <button
-                  onClick={() => runSimulatorScenario('NONAKTIF')}
-                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-red-50 rounded-lg text-center text-red-700 cursor-pointer"
-                >
-                  Nonaktif
-                </button>
-                <button
-                  onClick={() => runSimulatorScenario('KREDIT HABIS')}
-                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-red-50 rounded-lg text-center text-red-700 cursor-pointer"
-                >
-                  Decline
-                </button>
-                <button
-                  onClick={() => runSimulatorScenario('DOUBLE TAP')}
-                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-amber-50 rounded-lg text-center text-amber-700 cursor-pointer"
-                >
-                  Double Tap
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* STATS OVERVIEW CARD */}
           <div className="bg-white border border-[#e5e3db] rounded-2xl p-3 flex items-center justify-between shadow-2xs my-1 text-left shrink-0">
@@ -1440,8 +1243,8 @@ export default function MerchantTerminalPage() {
                 onClick={() => setActiveDrawer('topup')}
                 className={`py-2 text-center text-xs font-black rounded-xl transition-all cursor-pointer ${
                   activeDrawer === 'topup'
-                    ? 'bg-[#2563EB] text-white shadow-xs'
-                    : 'text-gray-500 hover:text-[#2563EB]'
+                    ? 'bg-[#29ABE2] text-white shadow-xs'
+                    : 'text-gray-500 hover:text-[#29ABE2]'
                 }`}
               >
                 Top Up Saldo
@@ -1465,13 +1268,9 @@ export default function MerchantTerminalPage() {
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={handleSimulateNewChip}
-                      className="w-full text-xs font-black bg-[#7C3AED] hover:bg-[#6D28D9] focus:ring-[#7C3AED] text-white py-3 rounded-xl transition-all cursor-pointer"
-                    >
-                      Simulasikan Chip Baru (UID Acak)
-                    </button>
+                    <div className="w-full py-3 px-4 border border-[#ddd6fe] bg-[#f5f3ff] rounded-xl text-xs font-bold text-[#7C3AED] text-center">
+                      Menunggu pembacaan NFC...
+                    </div>
                   </div>
                 ) : (
                   <form onSubmit={handleRegSubmit(onRegisterSubmit)} className="flex flex-col gap-4 text-left">
@@ -1561,14 +1360,14 @@ export default function MerchantTerminalPage() {
                   /* Scanner Screen */
                   <div className="flex flex-col items-center text-center gap-6 py-4">
                     <div className="relative w-32 h-32 flex items-center justify-center">
-                      <div className="absolute inset-0 rounded-full border border-blue-500/20 animate-ping" />
-                      <div className="absolute inset-4 rounded-full border border-blue-500/35 animate-ping" style={{ animationDelay: '0.4s' }} />
+                      <div className="absolute inset-0 rounded-full border border-[#29ABE2]/20 animate-ping" />
+                      <div className="absolute inset-4 rounded-full border border-[#29ABE2]/35 animate-ping" style={{ animationDelay: '0.4s' }} />
 
                       <button
                         type="button"
                         onClick={triggerTopUpNFCScan}
                         disabled={isTopUpScanning || topUpScanLoading}
-                        className="w-24 h-24 rounded-full bg-[#2563EB] hover:bg-[#1d4ed8] active:scale-95 transition-all text-white flex flex-col items-center justify-center gap-1.5 shadow-lg shadow-blue-500/20 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed z-10"
+                        className="w-24 h-24 rounded-full bg-[#29ABE2] hover:bg-[#1C95C6] active:scale-95 transition-all text-white flex flex-col items-center justify-center gap-1.5 shadow-lg shadow-[#29ABE2]/20 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed z-10"
                       >
                         <SmartphoneNfc className={`h-8 w-8 ${isTopUpScanning ? 'animate-bounce' : ''}`} />
                         <span className="text-[9px] font-black uppercase tracking-widest">
@@ -1582,32 +1381,13 @@ export default function MerchantTerminalPage() {
                       <p className="text-xs text-[#64748b] font-medium">Scan gelang terdaftar untuk melakukan top up</p>
                     </div>
 
-                    {simulationMode ? (
-                      <button
-                        type="button"
-                        onClick={handleSimulateTopUpScan}
-                        disabled={topUpScanLoading}
-                        className="w-full py-3 px-4 border border-blue-200 bg-[#eff6ff] hover:bg-blue-100 rounded-xl transition-all cursor-pointer font-black text-blue-700 text-center text-xs"
-                      >
-                        {topUpScanLoading ? 'Memproses...' : 'Simulasikan Scan (Wisatawan Terdaftar)'}
-                      </button>
+                    {topUpScanLoading ? (
+                      <div className="w-full py-3 px-4 border border-[#cce8f5] bg-[#E8F6FD] rounded-xl text-xs font-bold text-[#29ABE2] text-center animate-pulse">
+                        Memproses...
+                      </div>
                     ) : (
-                      /* Offline lists */
-                      <div className="w-full flex flex-col gap-2 max-h-[160px] overflow-y-auto pr-1">
-                        {offlineVisitors.map(({ visitor: v, tag: t }) => (
-                          <button
-                            key={v.id}
-                            type="button"
-                            onClick={() => processTopUpRFID(t.uid)}
-                            className="flex items-center justify-between p-2.5 bg-[#f7f7f5] border border-[#e5e3db] rounded-xl text-left hover:bg-[#eff6ff] hover:border-blue-300 transition-all text-xs cursor-pointer"
-                          >
-                            <div>
-                              <p className="font-bold text-[#1e293b]">{v.name}</p>
-                              <p className="text-[10px] text-gray-400 font-mono">{t.uid}</p>
-                            </div>
-                            <Badge variant={v.ticket_type}>{v.ticket_type}</Badge>
-                          </button>
-                        ))}
+                      <div className="w-full py-3 px-4 border border-[#cce8f5] bg-[#E8F6FD] rounded-xl text-xs font-bold text-[#29ABE2] text-center">
+                        Menunggu tap NFC gelang...
                       </div>
                     )}
                   </div>
@@ -1616,7 +1396,7 @@ export default function MerchantTerminalPage() {
                   <div className="flex flex-col gap-4">
                     {/* Profile Header */}
                     <div className="flex items-center gap-3 bg-white p-3 border border-[#e5e3db] rounded-2xl">
-                      <div className="w-11 h-11 rounded-2xl bg-[#eff6ff] text-[#2563EB] font-black flex items-center justify-center text-sm border border-blue-100">
+                      <div className="w-11 h-11 rounded-2xl bg-[#E8F6FD] text-[#29ABE2] font-black flex items-center justify-center text-sm border border-[#cce8f5]">
                         {topUpVisitor.name.substring(0, 2).toUpperCase()}
                       </div>
                       <div>
@@ -1632,7 +1412,7 @@ export default function MerchantTerminalPage() {
                     <div className="bg-white p-4 border border-[#e5e3db] rounded-2xl space-y-2">
                       <div className="flex justify-between text-xs font-bold text-[#1e293b]">
                         <span>Kredit Saat Ini</span>
-                        <span className="text-[#2563EB]">
+                        <span className="text-[#29ABE2]">
                           Sisa: {topUpVisitor.credit_limit === 0 ? 'Unlimited' : formatRupiah(topUpVisitor.credit_limit - topUpVisitor.credit_used)}
                         </span>
                       </div>
@@ -1640,7 +1420,7 @@ export default function MerchantTerminalPage() {
                       {/* Progress Line */}
                       <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden relative">
                         <div
-                          className="h-full bg-blue-500 transition-all duration-300"
+                          className="h-full bg-[#29ABE2] transition-all duration-300"
                           style={{ width: `${topUpVisitor.credit_limit === 0 ? 0 : Math.max(0, Math.min(100, (topUpVisitor.credit_used / topUpVisitor.credit_limit) * 100))}%` }}
                         />
                       </div>
@@ -1662,7 +1442,7 @@ export default function MerchantTerminalPage() {
                             key={val}
                             type="button"
                             onClick={() => setTopUpAmount(val.toLocaleString('id-ID'))}
-                            className="py-2.5 text-center text-xs font-bold text-blue-600 bg-[#eff6ff] border border-transparent rounded-xl hover:bg-blue-100 transition-colors cursor-pointer active:scale-95"
+                            className="py-2.5 text-center text-xs font-bold text-[#29ABE2] bg-[#E8F6FD] border border-transparent rounded-xl hover:bg-[#D5EEFC] transition-colors cursor-pointer active:scale-95"
                           >
                             {formatRupiah(val)}
                           </button>
@@ -1717,7 +1497,7 @@ export default function MerchantTerminalPage() {
                         type="button"
                         onClick={handleConfirmTopUp}
                         disabled={topUpLoading || !(parseInt(topUpAmount.replace(/\./g, ''), 10) > 0)}
-                        className="w-full text-xs font-black bg-[#2563EB] hover:bg-[#1d4ed8] focus:ring-blue-500 text-white py-3 rounded-xl transition-all cursor-pointer shadow-sm text-center"
+                        className="w-full text-xs font-black bg-[#29ABE2] hover:bg-[#1C95C6] focus:ring-[#29ABE2] text-white py-3 rounded-xl transition-all cursor-pointer shadow-sm text-center"
                       >
                         {topUpLoading ? 'Memproses...' : 'Konfirmasi Top Up'}
                       </button>
@@ -1952,31 +1732,6 @@ export default function MerchantTerminalPage() {
               </div>
             </div>
 
-            {/* Mode Simulasi Toggle */}
-            {!isSupabaseConfigured && (
-              <div className="bg-white border border-[#e5e3db] rounded-3xl p-5 shadow-xs flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <h3 className="text-xs font-black uppercase tracking-wider text-[#1e293b]">
-                    Mode Simulasi
-                  </h3>
-                  <p className="text-[10px] text-gray-400 font-medium">
-                    Aktifkan emulator offline / local storage
-                  </p>
-                </div>
-                <button
-                  onClick={handleToggleSim}
-                  className={`w-11 h-6 rounded-full transition-all relative shrink-0 cursor-pointer ${
-                    simulationMode ? 'bg-[#29ABE2]' : 'bg-slate-300'
-                  }`}
-                >
-                  <span
-                    className={`w-4.5 h-4.5 rounded-full bg-white absolute top-0.5 transition-all shadow-xs ${
-                      simulationMode ? 'left-5.5' : 'left-1'
-                    }`}
-                  />
-                </button>
-              </div>
-            )}
 
             {/* Card Akun */}
             <div className="bg-white border border-[#e5e3db] rounded-3xl p-5 shadow-xs flex flex-col gap-3">
@@ -2167,7 +1922,7 @@ export default function MerchantTerminalPage() {
                       </div>
 
                       <div className="text-right shrink-0">
-                        <span className={`font-black ${tx.type === 'entry' ? 'text-blue-600' : 'text-red-600'}`}>
+                        <span className={`font-black ${tx.type === 'entry' ? 'text-[#29ABE2]' : 'text-red-600'}`}>
                           {tx.type === 'entry' ? 'Entry' : `-${formatRupiah(tx.amount)}`}
                         </span>
                         <span className="text-[9px] font-bold text-green-600 block mt-0.5 bg-green-50 px-1 rounded-full border border-green-100 text-center">
