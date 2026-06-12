@@ -2,18 +2,17 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
 import { Shield, Bell, Menu } from 'lucide-react';
 import { checkMerchantActivity, SilentMerchant } from '@/lib/services/alertService';
 import { formatPhoneForWA } from '@/lib/utils';
 
 interface NavbarProps {
   onMenuClick: () => void;
+  userEmail?: string | null;
 }
 
-export const AdminNavbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
+export const AdminNavbar: React.FC<NavbarProps> = ({ onMenuClick, userEmail }) => {
   const pathname = usePathname();
-  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [alerts, setAlerts] = useState<SilentMerchant[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -147,7 +146,7 @@ export const AdminNavbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
           <div className="text-left hidden xs:block">
             <p className="text-[10px] font-bold text-[#1e293b] leading-tight">Administrator</p>
             <p className="text-[9px] text-[#64748b] font-semibold truncate max-w-[100px] mt-0.5">
-              {user?.email || 'admin@wavr.com'}
+              {userEmail || 'admin@wavr.com'}
             </p>
           </div>
         </div>

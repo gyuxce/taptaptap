@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { X, Calendar, MapPin, Clock, Compass, ShoppingBag } from 'lucide-react';
 import { Visitor, JourneyItem, JourneyStats } from '@/types';
 import { getVisitorJourney } from '@/lib/services/visitorService';
@@ -96,27 +95,19 @@ export const VisitorJourneyDrawer: React.FC<VisitorJourneyDrawerProps> = ({
     return merchantSpends.length > 0 ? merchantSpends[0].amount : 0;
   }, [merchantSpends]);
 
+  if (!isOpen) return null;
+
   return (
-    <AnimatePresence>
-      {isOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
           {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          <button
+            aria-label="Tutup detail perjalanan"
             onClick={onClose}
-            className="fixed inset-0 bg-slate-900/45"
+            className="fixed inset-0 bg-slate-900/45 animate-overlay-in"
           />
 
           {/* Drawer Panel */}
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="relative w-full sm:w-[400px] bg-[#F8FAFF] border-l border-[#E2EEFF] shadow-2xl z-10 flex flex-col h-full overflow-hidden"
-          >
+          <div className="relative z-10 flex h-full w-full flex-col overflow-hidden border-l border-[#E2EEFF] bg-[#F8FAFF] shadow-xl animate-drawer-in transform-gpu will-change-transform sm:w-[400px]">
             {/* Header */}
             <div className="p-5 bg-white border-b border-[#E2EEFF] flex flex-col gap-4">
               <div className="flex justify-between items-start">
@@ -272,9 +263,7 @@ export const VisitorJourneyDrawer: React.FC<VisitorJourneyDrawerProps> = ({
               )}
 
             </div>
-          </motion.div>
+          </div>
         </div>
-      )}
-    </AnimatePresence>
   );
 };

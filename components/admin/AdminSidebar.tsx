@@ -3,19 +3,19 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { signOut, useAuth } from '@/lib/auth';
+import { signOut } from '@/lib/auth';
 import { LayoutDashboard, Users, Store, History, LogOut, FileBarChart } from 'lucide-react';
 import { WavrLogo } from '@/components/ui/WavrLogo';
 
 interface SidebarProps {
   className?: string;
   onCloseMobile?: () => void;
+  userEmail?: string | null;
 }
 
-export const AdminSidebar: React.FC<SidebarProps> = ({ className, onCloseMobile }) => {
+export const AdminSidebar: React.FC<SidebarProps> = ({ className, onCloseMobile, userEmail }) => {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useAuth();
 
   const handleLogout = async () => {
     await signOut();
@@ -73,7 +73,7 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ className, onCloseMobile 
           <div className="text-left min-w-0">
             <p className="text-xs font-black text-white truncate">Administrator</p>
             <p className="text-[10px] text-[#94A3B8] font-medium truncate">
-              {user?.email || 'admin@wavr.com'}
+              {userEmail || 'admin@wavr.com'}
             </p>
           </div>
         </div>

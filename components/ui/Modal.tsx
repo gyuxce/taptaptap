@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -15,46 +14,19 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   children,
 }) => {
+  if (!isOpen) return null;
+
   return (
-    <AnimatePresence>
-      {isOpen && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
           {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          <button
+            aria-label="Tutup dialog"
             onClick={onClose}
-            className="fixed inset-0 bg-[#1B2340]/45"
+            className="fixed inset-0 bg-[#1B2340]/45 animate-overlay-in"
           />
 
           {/* Modal Container */}
-          <motion.div
-            initial={{ 
-              y: '100%', 
-              opacity: 0,
-              scale: 1
-            }}
-            animate={{ 
-              y: 0, 
-              opacity: 1,
-              scale: 1
-            }}
-            exit={{ 
-              y: '100%', 
-              opacity: 0,
-              scale: 1
-            }}
-            variants={{
-              desktop: { y: 0, opacity: 1, scale: 1 },
-              mobile: { y: 0, opacity: 1 }
-            }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="relative w-full md:max-w-lg bg-[#F8FAFF] border-t md:border border-[#E2EEFF] rounded-t-3xl md:rounded-2xl shadow-2xl z-10 flex flex-col max-h-[92vh] md:max-h-[85vh] overflow-hidden md:animate-none"
-            style={{
-              transformOrigin: 'bottom center'
-            }}
-          >
+          <div className="relative z-10 flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-3xl border-t border-[#E2EEFF] bg-[#F8FAFF] shadow-xl animate-sheet-in transform-gpu will-change-transform md:max-h-[85vh] md:max-w-lg md:rounded-2xl md:border md:animate-dialog-in">
             {/* Mobile Drag Indicator Bar */}
             <div className="flex md:hidden justify-center py-3">
               <div className="w-12 h-1.5 bg-[#E2EEFF] rounded-full cursor-grab active:cursor-grabbing" />
@@ -79,9 +51,7 @@ export const Modal: React.FC<ModalProps> = ({
             <div className="flex-1 overflow-y-auto p-6">
               {children}
             </div>
-          </motion.div>
+          </div>
         </div>
-      )}
-    </AnimatePresence>
   );
 };
