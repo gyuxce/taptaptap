@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut, useAuth } from '@/lib/auth';
 import { LayoutDashboard, Users, Store, History, LogOut, Compass, FileBarChart } from 'lucide-react';
+import { WavrLogo } from '@/components/ui/WavrLogo';
 
 interface SidebarProps {
   className?: string;
@@ -35,18 +36,8 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ className, onCloseMobile 
     <aside className={`w-[240px] bg-[#1B2340] border-r border-[#24335c] flex flex-col justify-between h-screen sticky top-0 text-slate-200 shrink-0 ${className}`}>
       <div className="flex flex-col flex-1">
         {/* Header */}
-        <div className="p-6 border-b border-[#24335c] flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-[#29ABE2] flex items-center justify-center text-white shadow-md shadow-[#29ABE2]/25">
-            <Compass className="h-5 w-5" />
-          </div>
-          <div className="text-left">
-            <span className="font-extrabold text-sm tracking-tight text-white block">
-              WAVR
-            </span>
-            <span className="text-[9px] font-bold text-gray-500 tracking-wider uppercase block">
-              Admin Terminal
-            </span>
-          </div>
+        <div className="p-6 border-b border-[#24335c] flex items-center justify-start gap-2.5">
+          <WavrLogo variant="white" size="md" />
         </div>
 
         {/* Navigation */}

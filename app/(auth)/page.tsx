@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Toaster, toast } from '@/components/ui/Toast';
+import { WavrLogo } from '@/components/ui/WavrLogo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -109,8 +110,8 @@ export default function LoginPage() {
       >
         {/* Logo and Intro */}
         <div className="flex flex-col items-center text-center">
-          <div className="w-16 h-16 rounded-2xl bg-[#E8F6FD] flex items-center justify-center text-[#29ABE2] mb-4 shadow-xs">
-            <SmartphoneNfc className="h-8 w-8" />
+          <div className="rounded-full bg-[#E8F6FD] p-5 flex items-center justify-center mb-4 shrink-0 shadow-xs">
+            <WavrLogo variant="icon" size="lg" />
           </div>
           <h1 className="text-xl font-extrabold tracking-tight text-[#1e293b]">
             WAVR

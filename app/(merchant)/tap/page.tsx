@@ -23,6 +23,7 @@ import { formatRupiah, formatDatetime, normalizeUID } from '@/lib/utils';
 
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { WavrLogo } from '@/components/ui/WavrLogo';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Toaster, toast } from '@/components/ui/Toast';
@@ -1006,6 +1007,7 @@ export default function MerchantTerminalPage() {
                 <FilePlus2 className="h-4.5 w-4.5" />
               </button>
             )}
+            <WavrLogo variant="full" size="sm" className="mr-1.5 shrink-0" />
             <div className="text-left min-w-0">
               <h2 className="text-sm font-extrabold text-[#1e293b] truncate">
                 {merchant.name}
