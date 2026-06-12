@@ -26,8 +26,8 @@ export const Button: React.FC<ButtonProps> = ({
         fullWidth ? 'w-full' : 'w-auto',
         {
           // Variants
-          'bg-[#1D9E75] text-white hover:bg-[#168260] focus:ring-[#1D9E75] shadow-xs': variant === 'primary',
-          'bg-[#E1F5EE] text-[#1D9E75] hover:bg-[#cbeedf] focus:ring-[#1D9E75]': variant === 'secondary',
+          'bg-[#29ABE2] text-white hover:bg-[#1C95C6] focus:ring-[#29ABE2] shadow-xs': variant === 'primary',
+          'bg-[#E8F6FD] text-[#29ABE2] hover:bg-[#D5EEFC] focus:ring-[#29ABE2]': variant === 'secondary',
           'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-xs': variant === 'danger',
           'text-[#64748b] hover:text-[#1e293b] hover:bg-[#f1efe9] focus:ring-gray-200': variant === 'ghost',
           

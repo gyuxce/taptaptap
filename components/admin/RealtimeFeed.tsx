@@ -243,7 +243,7 @@ export const RealtimeFeed: React.FC<RealtimeFeedProps> = ({ onNewTransaction }) 
                     {new Date(item.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     <span>·</span>
                     {item.type === 'entry' ? (
-                      <span className="text-[#1D9E75] font-black uppercase tracking-wider text-[8px] bg-green-50 border border-green-200 px-1.5 py-0.5 rounded">
+                      <span className="text-[#29ABE2] font-black uppercase tracking-wider text-[8px] bg-[#E8F6FD] border border-[#E2EEFF] px-1.5 py-0.5 rounded">
                         Tap Masuk
                       </span>
                     ) : (

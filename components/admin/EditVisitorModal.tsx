@@ -215,7 +215,7 @@ export const EditVisitorModal: React.FC<EditVisitorModalProps> = ({
           onClick={() => setActiveTab('data')}
           className={`flex-1 py-3 text-xs font-bold text-center border-b-2 transition-all cursor-pointer ${
             activeTab === 'data'
-              ? 'border-[#1D9E75] text-[#1D9E75]'
+              ? 'border-[#29ABE2] text-[#29ABE2]'
               : 'border-transparent text-gray-400 hover:text-[#1e293b]'
           }`}
         >
@@ -225,7 +225,7 @@ export const EditVisitorModal: React.FC<EditVisitorModalProps> = ({
           onClick={() => setActiveTab('rfid')}
           className={`flex-1 py-3 text-xs font-bold text-center border-b-2 transition-all cursor-pointer ${
             activeTab === 'rfid'
-              ? 'border-[#1D9E75] text-[#1D9E75]'
+              ? 'border-[#29ABE2] text-[#29ABE2]'
               : 'border-transparent text-gray-400 hover:text-[#1e293b]'
           }`}
         >
@@ -261,7 +261,7 @@ export const EditVisitorModal: React.FC<EditVisitorModalProps> = ({
             <select
               value={ticketType}
               onChange={(e) => setTicketType(e.target.value as Visitor['ticket_type'])}
-              className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#1D9E75] focus:ring-2 focus:ring-[#E1F5EE]"
+              className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2] focus:ring-2 focus:ring-[#E8F6FD]"
             >
               <option value="Regular">Regular</option>
               <option value="VIP">VIP</option>
@@ -333,7 +333,7 @@ export const EditVisitorModal: React.FC<EditVisitorModalProps> = ({
                   disabled={toggleLoading}
                   onClick={handleToggleRFID}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    tagActive ? 'bg-[#1D9E75]' : 'bg-gray-200'
+                    tagActive ? 'bg-[#29ABE2]' : 'bg-gray-200'
                   }`}
                 >
                   <span
@@ -358,7 +358,7 @@ export const EditVisitorModal: React.FC<EditVisitorModalProps> = ({
           {/* Top Up History list */}
           <div className="space-y-3">
             <h4 className="text-xs font-black uppercase tracking-wider text-[#1e293b] flex items-center gap-2">
-              <History className="h-4 w-4 text-[#1D9E75]" /> Riwayat Top Up Kredit
+              <History className="h-4 w-4 text-[#29ABE2]" /> Riwayat Top Up Kredit
             </h4>
 
             {historyLoading ? (
@@ -386,7 +386,7 @@ export const EditVisitorModal: React.FC<EditVisitorModalProps> = ({
                         Oleh: {topup.top_up_by_name || topup.top_up_by} • {formatDatetime(topup.created_at)}
                       </span>
                       {topup.note && (
-                        <span className="text-[10px] text-[#1D9E75] block mt-1 bg-[#E1F5EE] px-2 py-0.5 rounded-md w-fit font-semibold">
+                        <span className="text-[10px] text-[#29ABE2] block mt-1 bg-[#E8F6FD] px-2 py-0.5 rounded-md w-fit font-semibold">
                           Catatan: {topup.note}
                         </span>
                       )}

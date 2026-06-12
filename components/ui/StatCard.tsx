@@ -43,7 +43,7 @@ export const StatCard: React.FC<StatCardProps> = ({
           className={cn(
             'w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-colors duration-200 ml-4',
             {
-              'bg-[#E1F5EE] text-[#1D9E75] border-[#1D9E75]/10': tone === 'green',
+              'bg-[#E8F6FD] text-[#29ABE2] border-[#29ABE2]/10': tone === 'green',
               'bg-sky-50 text-sky-600 border-sky-100': tone === 'blue',
               'bg-amber-50 text-amber-600 border-amber-100': tone === 'amber',
               'bg-red-50 text-red-600 border-red-100': tone === 'red',

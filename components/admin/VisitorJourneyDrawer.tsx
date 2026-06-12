@@ -230,7 +230,7 @@ export const VisitorJourneyDrawer: React.FC<VisitorJourneyDrawerProps> = ({
                             </h5>
                             <p className="text-[10px] text-gray-400 font-medium mt-0.5">
                               {item.merchant_category} • {item.type === 'entry' ? (
-                                <span className="text-[#1D9E75] font-semibold">Tap Masuk</span>
+                                <span className="text-[#29ABE2] font-semibold">Tap Masuk</span>
                               ) : (
                                 <span className="text-red-500 font-semibold">{formatRupiah(item.amount)}</span>
                               )}

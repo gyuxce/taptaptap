@@ -109,14 +109,14 @@ export default function LoginPage() {
       >
         {/* Logo and Intro */}
         <div className="flex flex-col items-center text-center">
-          <div className="w-16 h-16 rounded-2xl bg-[#E1F5EE] flex items-center justify-center text-[#1D9E75] mb-4 shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-[#E8F6FD] flex items-center justify-center text-[#29ABE2] mb-4 shadow-xs">
             <SmartphoneNfc className="h-8 w-8" />
           </div>
           <h1 className="text-xl font-extrabold tracking-tight text-[#1e293b]">
-            EcoTour Tap System
+            WAVR
           </h1>
           <p className="text-xs text-[#64748b] mt-1 font-medium">
-            Masuk untuk melanjutkan
+            One Wave, Endless Experience
           </p>
         </div>
 
@@ -142,7 +142,7 @@ export default function LoginPage() {
           <Input
             label="Alamat Email"
             type="email"
-            placeholder="nama@ecotour.com"
+            placeholder="nama@wavr.com"
             error={errors.email?.message}
             icon={<Mail className="h-4 w-4" />}
             disabled={loading}
@@ -173,20 +173,20 @@ export default function LoginPage() {
         {/* Quick Demo Autofill helper */}
         {!isSupabaseConfigured && (
           <div className="bg-[#fcfbf9] border border-dashed border-[#e5e3db] rounded-2xl p-4 flex flex-col gap-3 mt-2">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#1D9E75] flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#1D9E75] animate-pulse" />
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#29ABE2] flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#29ABE2] animate-pulse" />
               Demo Quick Fill (Offline Mode)
             </div>
             <div className="flex flex-col gap-2">
               <button
                 type="button"
-                onClick={() => fillCredentials('admin@ecotour.com')}
+                onClick={() => fillCredentials('admin@wavr.com')}
                 disabled={loading}
-                className="w-full flex items-center justify-between p-2.5 bg-white border border-[#e5e3db] hover:border-[#1D9E75]/30 hover:bg-[#E1F5EE] rounded-xl text-left transition-all text-xs cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-between p-2.5 bg-white border border-[#e5e3db] hover:border-[#29ABE2]/30 hover:bg-[#E8F6FD] rounded-xl text-left transition-all text-xs cursor-pointer disabled:opacity-50"
               >
                 <div>
                   <p className="font-bold text-[#1e293b]">Administrator</p>
-                  <p className="text-[10px] text-gray-500 font-mono">admin@ecotour.com</p>
+                  <p className="text-[10px] text-gray-500 font-mono">admin@wavr.com</p>
                 </div>
                 <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-bold">
                   Admin
@@ -195,13 +195,13 @@ export default function LoginPage() {
 
               <button
                 type="button"
-                onClick={() => fillCredentials('zipline@ecotour.com')}
+                onClick={() => fillCredentials('zipline@wavr.com')}
                 disabled={loading}
-                className="w-full flex items-center justify-between p-2.5 bg-white border border-[#e5e3db] hover:border-[#1D9E75]/30 hover:bg-[#E1F5EE] rounded-xl text-left transition-all text-xs cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-between p-2.5 bg-white border border-[#e5e3db] hover:border-[#29ABE2]/30 hover:bg-[#E8F6FD] rounded-xl text-left transition-all text-xs cursor-pointer disabled:opacity-50"
               >
                 <div>
                   <p className="font-bold text-[#1e293b]">Merchant Loket</p>
-                  <p className="text-[10px] text-gray-500 font-mono">zipline@ecotour.com</p>
+                  <p className="text-[10px] text-gray-500 font-mono">zipline@wavr.com</p>
                 </div>
                 <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-bold">
                   Loket
@@ -210,13 +210,13 @@ export default function LoginPage() {
 
               <button
                 type="button"
-                onClick={() => fillCredentials('cafe@ecotour.com')}
+                onClick={() => fillCredentials('cafe@wavr.com')}
                 disabled={loading}
-                className="w-full flex items-center justify-between p-2.5 bg-white border border-[#e5e3db] hover:border-[#1D9E75]/30 hover:bg-[#E1F5EE] rounded-xl text-left transition-all text-xs cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-between p-2.5 bg-white border border-[#e5e3db] hover:border-[#29ABE2]/30 hover:bg-[#E8F6FD] rounded-xl text-left transition-all text-xs cursor-pointer disabled:opacity-50"
               >
                 <div>
                   <p className="font-bold text-[#1e293b]">Merchant Regular</p>
-                  <p className="text-[10px] text-gray-500 font-mono">cafe@ecotour.com</p>
+                  <p className="text-[10px] text-gray-500 font-mono">cafe@wavr.com</p>
                 </div>
                 <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
                   Regular

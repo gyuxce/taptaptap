@@ -1,12 +1,12 @@
 {
-  "name": "EcoTour Tap System",
-  "short_name": "EcoTour",
-  "description": "Sistem NFC tap souvenir wisata digital",
+  "name": "WAVR",
+  "short_name": "WAVR",
+  "description": "Sistem tap NFC untuk wisata & event",
   "start_url": "/tap",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#1D9E75",
-  "background_color": "#f7f7f5",
+  "theme_color": "#29ABE2",
+  "background_color": "#F8FAFF",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }

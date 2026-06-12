@@ -77,7 +77,7 @@ export function getTicketColor(type: string): string {
     case 'VIP':
       return 'bg-amber-50 text-amber-800 border-amber-200';
     case 'Family':
-      return 'bg-[#E1F5EE] text-[#1D9E75] border-[#1D9E75]/10';
+      return 'bg-[#E8F6FD] text-[#29ABE2] border-[#29ABE2]/10';
     case 'Group':
       return 'bg-sky-50 text-sky-700 border-sky-200';
     default:

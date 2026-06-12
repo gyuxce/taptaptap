@@ -61,7 +61,7 @@ export default function AdminMerchantsPage() {
       merchant_type: 'regular',
       phone: '',
       owner_email: '',
-      owner_password: 'EcoTour2025!',
+      owner_password: 'WAVR2025!',
     }
   });
 
@@ -118,7 +118,7 @@ export default function AdminMerchantsPage() {
       merchant_type: 'regular',
       phone: '',
       owner_email: '',
-      owner_password: 'EcoTour2025!',
+      owner_password: 'WAVR2025!',
     });
     setIsCreateModalOpen(true);
   };
@@ -265,7 +265,7 @@ export default function AdminMerchantsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
         <div>
-          <span className="text-xs font-bold text-[#1D9E75] uppercase tracking-wider block">
+          <span className="text-xs font-bold text-[#29ABE2] uppercase tracking-wider block">
             Kelola Merchant Partner
           </span>
           <h1 className="text-xl md:text-2xl font-black text-[#1e293b] mt-0.5">
@@ -300,9 +300,9 @@ export default function AdminMerchantsPage() {
                 <tr key={m.id} className="border-b border-[#f7f7f5] hover:bg-[#f7f7f5]/30 transition-colors">
                   <td 
                     onClick={() => setSelectedMerchantDetail(m)}
-                    className="py-3 px-4 font-bold text-[#1e293b] flex items-center gap-2 cursor-pointer hover:text-[#1D9E75] transition-colors"
+                    className="py-3 px-4 font-bold text-[#1e293b] flex items-center gap-2 cursor-pointer hover:text-[#29ABE2] transition-colors"
                   >
-                    <Store className="h-4 w-4 text-[#1D9E75]" /> {m.name}
+                    <Store className="h-4 w-4 text-[#29ABE2]" /> {m.name}
                   </td>
                   <td className="py-3 px-2 text-gray-500 font-semibold">{m.category}</td>
                   <td className="py-3 px-2 text-[#64748b] font-medium flex items-center gap-1 mt-1">
@@ -319,9 +319,9 @@ export default function AdminMerchantsPage() {
                         href={`https://wa.me/${formatPhoneForWA(m.phone)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 hover:text-[#1D9E75] hover:underline"
+                        className="flex items-center gap-1 hover:text-[#29ABE2] hover:underline"
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#29ABE2] animate-pulse" />
                         {m.phone}
                       </a>
                     ) : (
@@ -338,7 +338,7 @@ export default function AdminMerchantsPage() {
                       onClick={() => setSelectedMerchantDetail(m)}
                       variant="ghost"
                       size="sm"
-                      className="text-[#1D9E75] hover:bg-[#E1F5EE] border border-[#1D9E75]/20 font-bold px-2 py-1 rounded-lg"
+                      className="text-[#29ABE2] hover:bg-[#E8F6FD] border border-[#29ABE2]/20 font-bold px-2 py-1 rounded-lg"
                     >
                       Detail
                     </Button>
@@ -412,7 +412,7 @@ export default function AdminMerchantsPage() {
               </label>
               <select
                 disabled={isSubmitting}
-                className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#1D9E75]"
+                className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]"
                 {...register('category')}
               >
                 <option value="Adventure">Adventure</option>
@@ -429,7 +429,7 @@ export default function AdminMerchantsPage() {
               </label>
               <select
                 disabled={isSubmitting}
-                className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#1D9E75]"
+                className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]"
                 {...register('merchant_type')}
               >
                 <option value="regular">Regular (Belanja)</option>
@@ -508,7 +508,7 @@ export default function AdminMerchantsPage() {
       >
         {generatedCredentials && (
           <div className="flex flex-col items-center text-center gap-5">
-            <div className="w-16 h-16 rounded-full bg-[#E1F5EE] border border-[#1D9E75]/20 flex items-center justify-center text-[#1D9E75] shadow-xs">
+            <div className="w-16 h-16 rounded-full bg-[#E8F6FD] border border-[#29ABE2]/20 flex items-center justify-center text-[#29ABE2] shadow-xs">
               <Key className="h-8 w-8" />
             </div>
 
@@ -563,7 +563,7 @@ export default function AdminMerchantsPage() {
         {selectedMerchantDetail && (
           <div className="flex flex-col gap-4 text-left text-xs font-bold text-slate-700">
             <div className="flex items-center gap-3 p-4 bg-slate-50 border border-[#e5e3db] rounded-2xl">
-              <div className="w-12 h-12 rounded-xl bg-[#E1F5EE] flex items-center justify-center text-[#1D9E75]">
+              <div className="w-12 h-12 rounded-xl bg-[#E8F6FD] flex items-center justify-center text-[#29ABE2]">
                 <Store className="h-6 w-6" />
               </div>
               <div>
@@ -599,9 +599,9 @@ export default function AdminMerchantsPage() {
                   href={`https://wa.me/${formatPhoneForWA(selectedMerchantDetail.phone)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#1D9E75] hover:underline flex items-center gap-1 mt-0.5"
+                  className="text-[#29ABE2] hover:underline flex items-center gap-1 mt-0.5"
                 >
-                  <Phone className="h-3.5 w-3.5 text-[#1D9E75]" /> {selectedMerchantDetail.phone} (Hubungi)
+                  <Phone className="h-3.5 w-3.5 text-[#29ABE2]" /> {selectedMerchantDetail.phone} (Hubungi)
                 </a>
               ) : (
                 <span className="text-slate-400 font-medium">-</span>

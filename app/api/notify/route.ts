@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 
     // Sanitization & simple validation
     const cleanPhone = String(phone || '').replace(/[^0-9+]/g, '');
-    const cleanMerchant = String(merchantName || 'EcoTour Merchant').trim();
+    const cleanMerchant = String(merchantName || 'WAVR Merchant').trim();
     const cleanAmount = Number(amount || 0);
     const cleanVisitorName = String(visitorName || 'Wisatawan').trim();
 
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     }
 
     const datetimeStr = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
-    const message = `Halo ${cleanVisitorName} 👋\n\nTransaksi berhasil dicatat!\n📍 Lokasi: ${cleanMerchant}\n💰 Nominal: Rp ${cleanAmount.toLocaleString('id-ID')}\n🕐 Waktu: ${datetimeStr} WIB\n\nTerima kasih telah berkunjung ke EcoTour! 🌿`;
+    const message = `Halo ${cleanVisitorName} 👋\n\nTransaksi berhasil dicatat!\n📍 Lokasi: ${cleanMerchant}\n💰 Nominal: Rp ${cleanAmount.toLocaleString('id-ID')}\n🕐 Waktu: ${datetimeStr} WIB\n\nTerima kasih telah berkunjung ke WAVR!`;
 
     console.log(`[api/notify] Dispatching Fonnte WA message to: ${formattedPhone}`);
 

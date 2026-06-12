@@ -129,7 +129,7 @@ export const TapSimulator: React.FC<TapSimulatorProps> = ({ merchant }) => {
         {/* Terminal Header */}
         <div className="flex items-center justify-between border-b border-[#e5e3db] pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-[#E1F5EE] flex items-center justify-center text-[#1D9E75]">
+            <div className="w-12 h-12 rounded-2xl bg-[#E8F6FD] flex items-center justify-center text-[#29ABE2]">
               <Scan className="h-6 w-6 animate-pulse" />
             </div>
             <div>
@@ -152,7 +152,7 @@ export const TapSimulator: React.FC<TapSimulatorProps> = ({ merchant }) => {
               value={rfidUID}
               onChange={(e) => setRfidUID(e.target.value)}
               disabled={loading}
-              className="font-mono text-base uppercase tracking-wider font-semibold border-2 border-[#e5e3db] focus:border-[#1D9E75]"
+              className="font-mono text-base uppercase tracking-wider font-semibold border-2 border-[#e5e3db] focus:border-[#29ABE2]"
             />
 
             {!isEntryGate && (
@@ -163,7 +163,7 @@ export const TapSimulator: React.FC<TapSimulatorProps> = ({ merchant }) => {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 disabled={loading}
-                className="text-base font-bold text-[#1D9E75]"
+                className="text-base font-bold text-[#29ABE2]"
               />
             )}
 
@@ -197,13 +197,13 @@ export const TapSimulator: React.FC<TapSimulatorProps> = ({ merchant }) => {
                       handleTap(t.uid);
                     }}
                     disabled={loading}
-                    className="flex items-center justify-between p-2.5 bg-white border border-[#e5e3db] hover:border-[#1D9E75]/30 hover:bg-[#E1F5EE] rounded-xl text-left transition-all text-xs cursor-pointer disabled:opacity-50"
+                    className="flex items-center justify-between p-2.5 bg-white border border-[#e5e3db] hover:border-[#29ABE2]/30 hover:bg-[#E8F6FD] rounded-xl text-left transition-all text-xs cursor-pointer disabled:opacity-50"
                   >
                     <div>
                       <p className="font-bold text-[#1e293b]">{v.name}</p>
                       <p className="text-[10px] text-gray-500 font-mono tracking-wider truncate max-w-[150px]">{t.uid} ({v.ticket_type})</p>
                     </div>
-                    <span className="font-bold text-[#1D9E75]">
+                    <span className="font-bold text-[#29ABE2]">
                       {isUnlimited ? 'Unlimited' : formatRupiah(balanceLeft)}
                     </span>
                   </button>
@@ -223,8 +223,8 @@ export const TapSimulator: React.FC<TapSimulatorProps> = ({ merchant }) => {
               className="absolute inset-0 bg-white/95 rounded-2xl flex flex-col items-center justify-center gap-4 z-30"
             >
               <div className="relative w-24 h-24 flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full border-4 border-[#1D9E75]/20 animate-ping" />
-                <div className="w-16 h-16 rounded-full bg-[#1D9E75] flex items-center justify-center text-white shadow-lg shadow-[#1D9E75]/20">
+                <div className="absolute inset-0 rounded-full border-4 border-[#29ABE2]/20 animate-ping" />
+                <div className="w-16 h-16 rounded-full bg-[#29ABE2] flex items-center justify-center text-white shadow-lg shadow-[#29ABE2]/20">
                   <Scan className="h-8 w-8 animate-spin" />
                 </div>
               </div>
@@ -241,7 +241,7 @@ export const TapSimulator: React.FC<TapSimulatorProps> = ({ merchant }) => {
               exit={{ opacity: 0 }}
               className={`border rounded-2xl p-5 mt-4 flex items-start gap-4 ${
                 tapResult.success 
-                  ? 'bg-[#E1F5EE] border-[#1D9E75]/30 text-[#1D9E75]' 
+                  ? 'bg-[#E8F6FD] border-[#29ABE2]/30 text-[#29ABE2]' 
                   : 'bg-red-50 border-red-200 text-red-700'
               }`}
             >
@@ -256,7 +256,7 @@ export const TapSimulator: React.FC<TapSimulatorProps> = ({ merchant }) => {
                   <div className="mt-2 space-y-1 text-xs text-[#1e293b]/80">
                     <p>Nama Wisatawan: <span className="font-bold text-[#1e293b]">{tapResult.visitorName}</span></p>
                     {!isEntryGate && <p>Biaya Transaksi: <span className="font-bold text-red-600">{formatRupiah(tapResult.amount || 0)}</span></p>}
-                    <p>Sisa Saldo Gelang: <span className="font-bold text-[#1D9E75]">{tapResult.creditRemaining}</span></p>
+                    <p>Sisa Saldo Gelang: <span className="font-bold text-[#29ABE2]">{tapResult.creditRemaining}</span></p>
                   </div>
                 )}
                 <button
@@ -274,7 +274,7 @@ export const TapSimulator: React.FC<TapSimulatorProps> = ({ merchant }) => {
       {/* Recent Transactions Trail */}
       <div className="w-full lg:w-96 bg-white border border-[#e5e3db] rounded-2xl p-6 shadow-xs flex flex-col gap-4">
         <h3 className="text-base font-bold text-[#1e293b] flex items-center gap-2">
-          <History className="h-4.5 w-4.5 text-[#1D9E75]" /> Riwayat Tap Terminal
+          <History className="h-4.5 w-4.5 text-[#29ABE2]" /> Riwayat Tap Terminal
         </h3>
         <p className="text-xs text-[#64748b]">
           Menampilkan 10 tap terakhir dari merchant ini.

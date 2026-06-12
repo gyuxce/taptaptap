@@ -239,7 +239,7 @@ export default function AdminDashboardPage() {
               {silentMerchants.slice(0, 5).map(m => (
                 <a
                   key={m.id}
-                  href={`https://wa.me/${formatPhoneForWA(m.phone) || '6281234567890'}?text=Halo%20${encodeURIComponent(m.name)}%20Partner%20EcoTour.%20Sistem%20mendeteksi%20belum%20ada%20aktivitas%20tap%20selama%202%20jam%20terakhir.%20Apakah%20ada%20kendala%20alat%20tap%3F`}
+                  href={`https://wa.me/${formatPhoneForWA(m.phone) || '6281234567890'}?text=Halo%20${encodeURIComponent(m.name)}%20Partner%20WAVR.%20Sistem%20mendeteksi%20belum%20ada%20aktivitas%20tap%20selama%202%20jam%20terakhir.%20Apakah%20ada%20kendala%20alat%20tap%3F`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[9px] font-extrabold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
@@ -259,7 +259,7 @@ export default function AdminDashboardPage() {
         {/* Intro Header */}
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-xs font-bold text-[#1D9E75] uppercase tracking-wider block">
+            <span className="text-xs font-bold text-[#29ABE2] uppercase tracking-wider block">
               Dashboard Real-time
             </span>
             <h1 className="text-xl md:text-2xl font-black text-[#1e293b] mt-0.5">
@@ -353,7 +353,7 @@ export default function AdminDashboardPage() {
                     tickFormatter={(v) => v === 0 ? 'Rp0' : v % 1000 === 0 ? `Rp${v/1000}k` : `Rp${(v/1000).toFixed(1)}k`} 
                   />
                   <Tooltip formatter={(v) => formatRupiah(Number(v))} contentStyle={{ fontSize: 11, borderRadius: 12 }} />
-                  <Bar dataKey="revenue" fill="#1D9E75" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="revenue" fill="#29ABE2" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

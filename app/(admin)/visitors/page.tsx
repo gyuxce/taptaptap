@@ -172,7 +172,7 @@ export default function AdminVisitorsPage() {
     <div className="flex flex-col gap-6 text-left">
       <div className="flex justify-between items-center">
         <div>
-          <span className="text-xs font-bold text-[#1D9E75] uppercase tracking-wider block">
+          <span className="text-xs font-bold text-[#29ABE2] uppercase tracking-wider block">
             Kelola Wisatawan
           </span>
           <h1 className="text-xl md:text-2xl font-black text-[#1e293b] mt-0.5">
@@ -202,7 +202,7 @@ export default function AdminVisitorsPage() {
               setTicketFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#1D9E75]"
+            className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]"
           >
             <option value="all">Semua Tipe Tiket</option>
             <option value="Regular">Regular</option>
@@ -262,7 +262,7 @@ export default function AdminVisitorsPage() {
                       </td>
                       <td className="py-3 px-2">
                         {vis.credit_limit === 0 ? (
-                          <span className="font-extrabold text-[#1D9E75]">Unlimited</span>
+                          <span className="font-extrabold text-[#29ABE2]">Unlimited</span>
                         ) : (
                           <div className="flex flex-col gap-1 w-[130px]">
                             <span className="font-bold text-[#1e293b]">
@@ -271,7 +271,7 @@ export default function AdminVisitorsPage() {
                             <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                               <div
                                 className={`h-full ${
-                                  progressWidth > 50 ? 'bg-[#1D9E75]' : progressWidth > 20 ? 'bg-amber-500' : 'bg-red-500'
+                                  progressWidth > 50 ? 'bg-[#29ABE2]' : progressWidth > 20 ? 'bg-amber-500' : 'bg-red-500'
                                 }`}
                                 style={{ width: `${Math.max(0, Math.min(100, progressWidth))}%` }}
                               />
@@ -301,7 +301,7 @@ export default function AdminVisitorsPage() {
                             disabled={!tag}
                             variant="ghost"
                             size="sm"
-                            className="text-[10px] font-bold border border-green-200 text-[#1D9E75] bg-green-50 hover:bg-green-100 hover:text-green-700 rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="text-[10px] font-bold border border-[#E2EEFF] text-[#29ABE2] bg-[#E8F6FD] hover:bg-[#D5EEFC] hover:text-[#1C95C6] rounded-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Top Up
                           </Button>

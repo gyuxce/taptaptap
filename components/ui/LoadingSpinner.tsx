@@ -15,7 +15,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   const spinnerElement = (
     <div
       className={cn(
-        'animate-spin rounded-full border-3 border-[#1D9E75] border-t-transparent',
+        'animate-spin rounded-full border-3 border-[#29ABE2] border-t-transparent',
         {
           'h-5 w-5': size === 'sm',
           'h-8 w-8': size === 'md',

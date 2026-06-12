@@ -29,7 +29,7 @@ export const AdminNavbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
       case '/transactions':
         return 'Audit Log Transaksi NFC';
       default:
-        return 'EcoTour Admin';
+        return 'WAVR Admin';
     }
   };
 
@@ -122,10 +122,10 @@ export const AdminNavbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                         Belum ada aktivitas transaksi terdeteksi di {alert.location}.
                       </p>
                       <a
-                        href={`https://wa.me/${formatPhoneForWA(alert.phone) || '6281234567890'}?text=Halo%20${encodeURIComponent(alert.name)}%20Partner%20EcoTour.%20Sistem%20mendeteksi%20belum%20ada%20aktivitas%20tap%20selama%20${alert.hours_since_last_activity}%20jam%20terakhir.%20Apakah%20ada%20kendala%20alat%20tap%3F`}
+                        href={`https://wa.me/${formatPhoneForWA(alert.phone) || '6281234567890'}?text=Halo%20${encodeURIComponent(alert.name)}%20Partner%20WAVR.%20Sistem%20mendeteksi%20belum%20ada%20aktivitas%20tap%20selama%20${alert.hours_since_last_activity}%20jam%20terakhir.%20Apakah%20ada%20kendala%20alat%20tap%3F`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-full py-1.5 bg-[#1D9E75] hover:bg-[#157959] text-white text-[10px] font-extrabold rounded-lg text-center transition-colors shadow-xs"
+                        className="w-full py-1.5 bg-[#29ABE2] hover:bg-[#1C95C6] text-white text-[10px] font-extrabold rounded-lg text-center transition-colors shadow-xs"
                       >
                         Hubungi via WhatsApp
                       </a>
@@ -141,13 +141,13 @@ export const AdminNavbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
 
         {/* User profile details */}
         <div className="flex items-center gap-2 bg-[#f7f7f5] border border-[#e5e3db] px-3 py-1.5 rounded-xl">
-          <div className="w-5.5 h-5.5 rounded-full bg-[#1D9E75]/10 flex items-center justify-center text-[#1D9E75]">
+          <div className="w-5.5 h-5.5 rounded-full bg-[#29ABE2]/10 flex items-center justify-center text-[#29ABE2]">
             <Shield className="h-3.5 w-3.5" />
           </div>
           <div className="text-left hidden xs:block">
             <p className="text-[10px] font-bold text-[#1e293b] leading-tight">Administrator</p>
             <p className="text-[9px] text-[#64748b] font-semibold truncate max-w-[100px] mt-0.5">
-              {user?.email || 'admin@ecotour.com'}
+              {user?.email || 'admin@wavr.com'}
             </p>
           </div>
         </div>

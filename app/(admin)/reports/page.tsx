@@ -278,7 +278,7 @@ export default function ReportsPage() {
   };
 
   // Dynamic series mapping colors for Recharts Bar Chart
-  const COLORS = ['#1D9E75', '#3B82F6', '#6366F1', '#EC4899', '#F59E0B', '#10B981', '#8B5CF6'];
+  const COLORS = ['#29ABE2', '#3B82F6', '#6366F1', '#EC4899', '#F59E0B', '#10B981', '#8B5CF6'];
 
   // Identify all keys in chart data that are dynamic merchant names
   const chartSeries = useMemo(() => {
@@ -338,7 +338,7 @@ export default function ReportsPage() {
       {/* Intro Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <span className="text-xs font-bold text-[#1D9E75] uppercase tracking-wider block">
+          <span className="text-xs font-bold text-[#29ABE2] uppercase tracking-wider block">
             Panel Administrator
           </span>
           <h1 className="text-xl md:text-2xl font-black text-[#1e293b] mt-0.5">
@@ -360,7 +360,7 @@ export default function ReportsPage() {
             onClick={handleExportAllTransactions}
             className="flex items-center gap-1.5 text-xs font-bold bg-[#1e293b] hover:bg-[#0f172a] px-3.5 py-2.5 rounded-xl text-white cursor-pointer shadow-xs transition-all"
           >
-            <FileSpreadsheet className="h-4 w-4 text-[#1D9E75]" />
+            <FileSpreadsheet className="h-4 w-4 text-[#29ABE2]" />
             <span>Ekspor Semua Transaksi CSV</span>
           </button>
         </div>
@@ -380,7 +380,7 @@ export default function ReportsPage() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full text-xs font-bold border border-[#e5e3db] px-3.5 py-2 rounded-xl text-slate-700 bg-[#f7f7f5] focus:outline-none focus:border-[#1D9E75] transition-all"
+                className="w-full text-xs font-bold border border-[#e5e3db] px-3.5 py-2 rounded-xl text-slate-700 bg-[#f7f7f5] focus:outline-none focus:border-[#29ABE2] transition-all"
               />
             </div>
           </div>
@@ -395,7 +395,7 @@ export default function ReportsPage() {
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full text-xs font-bold border border-[#e5e3db] px-3.5 py-2 rounded-xl text-slate-700 bg-[#f7f7f5] focus:outline-none focus:border-[#1D9E75] transition-all"
+                className="w-full text-xs font-bold border border-[#e5e3db] px-3.5 py-2 rounded-xl text-slate-700 bg-[#f7f7f5] focus:outline-none focus:border-[#29ABE2] transition-all"
               />
             </div>
           </div>
@@ -428,7 +428,7 @@ export default function ReportsPage() {
                     <button
                       type="button"
                       onClick={selectAllMerchants}
-                      className="text-[10px] font-extrabold text-[#1D9E75] hover:underline"
+                      className="text-[10px] font-extrabold text-[#29ABE2] hover:underline"
                     >
                       Pilih Semua
                     </button>
@@ -452,12 +452,12 @@ export default function ReportsPage() {
                           onClick={() => handleSelectMerchant(m.id)}
                           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all text-left ${
                             isSelected 
-                              ? 'bg-[#E1F5EE] text-[#1D9E75]' 
+                              ? 'bg-[#E8F6FD] text-[#29ABE2]' 
                               : 'text-slate-600 hover:bg-[#f7f7f5]'
                           }`}
                         >
                           <span className="truncate">{m.name}</span>
-                          {isSelected && <Check className="h-3.5 w-3.5 text-[#1D9E75]" />}
+                          {isSelected && <Check className="h-3.5 w-3.5 text-[#29ABE2]" />}
                         </button>
                       );
                     })}
@@ -475,7 +475,7 @@ export default function ReportsPage() {
             <select
               value={ticketType}
               onChange={(e) => setTicketType(e.target.value)}
-              className="w-full text-xs font-bold border border-[#e5e3db] px-3.5 py-2 rounded-xl text-slate-700 bg-[#f7f7f5] focus:outline-none focus:border-[#1D9E75] transition-all appearance-none cursor-pointer"
+              className="w-full text-xs font-bold border border-[#e5e3db] px-3.5 py-2 rounded-xl text-slate-700 bg-[#f7f7f5] focus:outline-none focus:border-[#29ABE2] transition-all appearance-none cursor-pointer"
             >
               <option value="all">Semua Tipe Tiket</option>
               <option value="Regular">Regular</option>
@@ -489,7 +489,7 @@ export default function ReportsPage() {
           <button
             onClick={() => handleApplyFilters(false)}
             disabled={filtering}
-            className="h-9 px-5 bg-[#1D9E75] hover:bg-[#157959] disabled:bg-emerald-300 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            className="h-9 px-5 bg-[#29ABE2] hover:bg-[#1C95C6] disabled:bg-[#29ABE2]/50 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
           >
             <Filter className="h-4 w-4" />
             <span>Terapkan</span>
@@ -538,7 +538,7 @@ export default function ReportsPage() {
               Grafik pendapatan harian terhitung dalam rupiah
             </p>
           </div>
-          {filtering && <RefreshCw className="h-4 w-4 text-[#1D9E75] animate-spin" />}
+          {filtering && <RefreshCw className="h-4 w-4 text-[#29ABE2] animate-spin" />}
         </div>
 
         <div className="h-80 w-full">
@@ -578,7 +578,7 @@ export default function ReportsPage() {
                 
                 {/* Dynamically draw bars */}
                 {chartSeries.length === 0 ? (
-                  <Bar dataKey="Revenue" fill="#1D9E75" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Revenue" fill="#29ABE2" radius={[4, 4, 0, 0]} />
                 ) : (
                   chartSeries.map((key, idx) => (
                     <Bar
@@ -667,14 +667,14 @@ export default function ReportsPage() {
                       <td className="py-3 px-5 text-right font-bold text-red-600 bg-red-50/30">
                         {formatRupiah(comm)}
                       </td>
-                      <td className="py-3 px-5 text-right font-extrabold text-emerald-600 bg-emerald-50/20">
+                      <td className="py-3 px-5 text-right font-extrabold text-[#29ABE2] bg-[#E8F6FD]/20">
                         {formatRupiah(net)}
                       </td>
                       <td className="py-3 px-5 text-center">
                         <button
                           onClick={() => handleExportCommission(m.id, m.name)}
                           disabled={m.total_revenue === 0}
-                          className="px-2.5 py-1.5 text-[10px] font-bold border border-slate-200 hover:border-[#1D9E75] hover:bg-[#E1F5EE] text-slate-700 hover:text-[#1D9E75] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:border-slate-200 disabled:hover:text-slate-700 rounded-lg transition-all cursor-pointer"
+                          className="px-2.5 py-1.5 text-[10px] font-bold border border-slate-200 hover:border-[#29ABE2] hover:bg-[#E8F6FD] text-slate-700 hover:text-[#29ABE2] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:border-slate-200 disabled:hover:text-slate-700 rounded-lg transition-all cursor-pointer"
                         >
                           Unduh Komisi
                         </button>

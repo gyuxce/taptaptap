@@ -921,18 +921,18 @@ export default function MerchantTerminalPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#E1F5EE] z-50 flex flex-col items-center justify-center gap-4 text-center p-6"
+              className="absolute inset-0 bg-[#E8F6FD] z-50 flex flex-col items-center justify-center gap-4 text-center p-6"
             >
               <motion.div
                 initial={{ scale: 0.3, rotate: -45 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: 'spring', damping: 12 }}
-                className="w-24 h-24 rounded-full bg-[#1D9E75] flex items-center justify-center text-white shadow-lg"
+                className="w-24 h-24 rounded-full bg-[#29ABE2] flex items-center justify-center text-white shadow-lg"
               >
                 <CheckCircle2 className="h-12 w-12" />
               </motion.div>
               <div className="space-y-1">
-                <h3 className="text-lg font-black text-[#1D9E75] uppercase tracking-wide">
+                <h3 className="text-lg font-black text-[#29ABE2] uppercase tracking-wide">
                   Tap Berhasil Dicatat
                 </h3>
                 <p className="text-sm font-bold text-[#1e293b]">{successVisitorName}</p>
@@ -1051,13 +1051,13 @@ export default function MerchantTerminalPage() {
             <div className="relative w-44 h-44 flex items-center justify-center">
               
               {/* Concentric rings */}
-              <div className="absolute inset-0 rounded-full border border-[#1D9E75]/20 animate-ping" />
-              <div className="absolute inset-6 rounded-full border border-[#1D9E75]/35 animate-ping" style={{ animationDelay: '0.4s' }} />
+              <div className="absolute inset-0 rounded-full border border-[#29ABE2]/20 animate-ping" />
+              <div className="absolute inset-6 rounded-full border border-[#29ABE2]/35 animate-ping" style={{ animationDelay: '0.4s' }} />
 
               <button
                 onClick={triggerNFCScan}
                 disabled={isScanning || tapScenarioLoading}
-                className="w-32 h-32 rounded-full bg-[#1D9E75] hover:bg-[#168260] active:scale-95 transition-all text-white flex flex-col items-center justify-center gap-2.5 shadow-lg shadow-[#1D9E75]/25 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed z-10"
+                className="w-32 h-32 rounded-full bg-[#29ABE2] hover:bg-[#1C95C6] active:scale-95 transition-all text-white flex flex-col items-center justify-center gap-2.5 shadow-lg shadow-[#29ABE2]/25 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed z-10"
               >
                 <SmartphoneNfc className={`h-11 w-11 ${isScanning ? 'animate-bounce' : ''}`} />
                 <span className="text-[10px] font-black uppercase tracking-widest">
@@ -1093,7 +1093,7 @@ export default function MerchantTerminalPage() {
                 <button
                   onClick={runAutoDemo}
                   disabled={isDemoRunning}
-                  className="text-[9px] font-bold bg-[#E1F5EE] text-[#1D9E75] px-2.5 py-0.5 rounded-full cursor-pointer hover:bg-[#cbeedf] disabled:opacity-50"
+                  className="text-[9px] font-bold bg-[#E8F6FD] text-[#29ABE2] px-2.5 py-0.5 rounded-full cursor-pointer hover:bg-[#D5EEFC] disabled:opacity-50"
                 >
                   {isDemoRunning ? 'Menjalankan...' : 'Demo Otomatis'}
                 </button>
@@ -1102,13 +1102,13 @@ export default function MerchantTerminalPage() {
               <div className="grid grid-cols-3 gap-1.5 text-[9px] font-bold">
                 <button
                   onClick={() => runSimulatorScenario('VIP')}
-                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-[#E1F5EE] rounded-lg text-center text-[#1e293b] cursor-pointer"
+                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-[#E8F6FD] rounded-lg text-center text-[#1e293b] cursor-pointer"
                 >
                   VIP
                 </button>
                 <button
                   onClick={() => runSimulatorScenario('Regular')}
-                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-[#E1F5EE] rounded-lg text-center text-[#1e293b] cursor-pointer"
+                  className="p-1.5 border border-[#e5e3db] bg-white hover:bg-[#E8F6FD] rounded-lg text-center text-[#1e293b] cursor-pointer"
                 >
                   Reguler
                 </button>
@@ -1149,7 +1149,7 @@ export default function MerchantTerminalPage() {
             {!isEntryGate && (
               <div className="text-right">
                 <p className="text-[9px] font-bold text-[#64748b] uppercase tracking-wider">Revenue Hari Ini</p>
-                <h4 className="text-xs font-black text-[#1D9E75] mt-0.5">{formatRupiah(historyStats.today.total)}</h4>
+                <h4 className="text-xs font-black text-[#29ABE2] mt-0.5">{formatRupiah(historyStats.today.total)}</h4>
               </div>
             )}
           </div>
@@ -1163,7 +1163,7 @@ export default function MerchantTerminalPage() {
               <span className="text-[10px] font-black text-[#1e293b] uppercase tracking-wider flex items-center gap-1">
                 <History className="h-3.5 w-3.5 text-slate-400" /> Riwayat 5 Terakhir
               </span>
-              <span className="text-[9px] font-bold text-[#1D9E75] uppercase tracking-wider bg-[#E1F5EE] px-2 py-0.5 rounded-full">
+              <span className="text-[9px] font-bold text-[#29ABE2] uppercase tracking-wider bg-[#E8F6FD] px-2 py-0.5 rounded-full">
                 Lihat Semua
               </span>
             </div>
@@ -1210,7 +1210,7 @@ export default function MerchantTerminalPage() {
               
               {/* Header Visitor Profile */}
               <div className="flex items-center gap-3 bg-white p-3 border border-[#e5e3db] rounded-2xl">
-                <div className="w-12 h-12 rounded-2xl bg-[#E1F5EE] text-[#1D9E75] font-black flex items-center justify-center text-sm border border-[#1D9E75]/20">
+                <div className="w-12 h-12 rounded-2xl bg-[#E8F6FD] text-[#29ABE2] font-black flex items-center justify-center text-sm border border-[#29ABE2]/20">
                   {selectedVisitor.name.substring(0, 2).toUpperCase()}
                 </div>
                 <div>
@@ -1251,7 +1251,7 @@ export default function MerchantTerminalPage() {
                     <span>Sisa Kredit NFC</span>
                     <span className={
                       (selectedVisitor.credit_limit - selectedVisitor.credit_used) / selectedVisitor.credit_limit > 0.5
-                        ? 'text-green-600'
+                        ? 'text-[#29ABE2]'
                         : (selectedVisitor.credit_limit - selectedVisitor.credit_used) / selectedVisitor.credit_limit > 0.2
                         ? 'text-amber-600'
                         : 'text-red-600'
@@ -1265,7 +1265,7 @@ export default function MerchantTerminalPage() {
                     <div
                       className={`h-full transition-all duration-300 ${
                         (selectedVisitor.credit_limit - selectedVisitor.credit_used) / selectedVisitor.credit_limit > 0.5
-                          ? 'bg-[#1D9E75]'
+                          ? 'bg-[#29ABE2]'
                           : (selectedVisitor.credit_limit - selectedVisitor.credit_used) / selectedVisitor.credit_limit > 0.2
                           ? 'bg-amber-500'
                           : 'bg-red-500'
@@ -1301,7 +1301,7 @@ export default function MerchantTerminalPage() {
                               onClick={() => setPaymentAmount(val.toString())}
                               className={`py-3 text-center text-xs font-black rounded-xl transition-all cursor-pointer border active:scale-98 ${
                                 isSelected
-                                  ? 'bg-[#1D9E75] text-white border-transparent shadow-xs'
+                                  ? 'bg-[#29ABE2] text-white border-transparent shadow-xs'
                                   : 'bg-[#f7f7f5] text-[#1e293b] border-[#e5e3db] hover:bg-slate-100'
                               }`}
                             >
@@ -1333,7 +1333,7 @@ export default function MerchantTerminalPage() {
                           disabled={confirmTapLoading}
                           autoFocus
                           placeholder="Masukkan nominal"
-                          className="flex-1 px-4 py-2.5 text-sm bg-[#f7f7f5] text-[#1D9E75] font-black border border-[#e5e3db] rounded-xl outline-none focus:border-[#1D9E75]"
+                          className="flex-1 px-4 py-2.5 text-sm bg-[#f7f7f5] text-[#29ABE2] font-black border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]"
                         />
                         <button
                           type="button"
@@ -1369,9 +1369,9 @@ export default function MerchantTerminalPage() {
                       disabled={confirmTapLoading || !selectedTag.is_active || (!isEntryGate && !isValidAmount)}
                       className={`w-full text-xs py-3.5 font-black uppercase tracking-wider transition-all duration-200 rounded-xl text-center cursor-pointer ${
                         isEntryGate
-                          ? 'bg-[#1D9E75] text-white hover:bg-[#168260]'
+                          ? 'bg-[#29ABE2] text-white hover:bg-[#1C95C6]'
                           : isHighlighted
-                          ? 'bg-[#1D9E75] text-white hover:bg-[#168260] shadow-md shadow-[#1D9E75]/35 ring-4 ring-[#1D9E75]/25 scale-[1.01]'
+                          ? 'bg-[#29ABE2] text-white hover:bg-[#1C95C6] shadow-md shadow-[#29ABE2]/35 ring-4 ring-[#292929]/25 scale-[1.01]'
                           : 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed'
                       }`}
                     >
@@ -1913,7 +1913,7 @@ export default function MerchantTerminalPage() {
                     type="number"
                     value={defaultNominal}
                     onChange={(e) => handleUpdateDefaultNominal(e.target.value)}
-                    className="w-full px-4 py-2.5 text-sm bg-white text-[#1D9E75] font-bold border border-[#e5e3db] rounded-xl outline-none focus:border-[#1D9E75]"
+                    className="w-full px-4 py-2.5 text-sm bg-white text-[#29ABE2] font-bold border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]"
                   />
                 </div>
               </div>
@@ -1964,7 +1964,7 @@ export default function MerchantTerminalPage() {
                 <button
                   onClick={handleToggleSim}
                   className={`w-11 h-6 rounded-full transition-all relative shrink-0 cursor-pointer ${
-                    simulationMode ? 'bg-[#1D9E75]' : 'bg-slate-300'
+                    simulationMode ? 'bg-[#29ABE2]' : 'bg-slate-300'
                   }`}
                 >
                   <span
@@ -2047,7 +2047,7 @@ export default function MerchantTerminalPage() {
                   <button
                     onClick={handleExportCSV}
                     disabled={historyTxs.length === 0 || historyFetchLoading}
-                    className="flex items-center gap-1.5 text-[10px] font-bold bg-[#E1F5EE] text-[#1D9E75] hover:bg-[#cbeedf] px-2.5 py-1 rounded-full cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-1.5 text-[10px] font-bold bg-[#E8F6FD] text-[#29ABE2] hover:bg-[#D5EEFC] px-2.5 py-1 rounded-full cursor-pointer disabled:opacity-50"
                   >
                     <Download className="h-3.5 w-3.5" /> Export CSV
                   </button>
@@ -2062,7 +2062,7 @@ export default function MerchantTerminalPage() {
                     onClick={() => setHistoryFilter(f)}
                     className={`py-1.5 rounded-lg border text-center transition-all cursor-pointer ${
                       historyFilter === f
-                        ? 'bg-[#1D9E75] border-[#1D9E75] text-white'
+                        ? 'bg-[#29ABE2] border-[#29ABE2] text-white'
                         : 'bg-[#f7f7f5] border-[#e5e3db] text-[#64748b] hover:bg-slate-100'
                     }`}
                   >
@@ -2114,7 +2114,7 @@ export default function MerchantTerminalPage() {
                         tickFormatter={(v) => v === 0 ? 'Rp0' : v % 1000 === 0 ? `Rp${v/1000}k` : `Rp${(v/1000).toFixed(1)}k`} 
                       />
                       <Tooltip formatter={(v) => formatRupiah(Number(v))} contentStyle={{ fontSize: 10, borderRadius: 8 }} />
-                      <Bar dataKey="revenue" fill="#1D9E75" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="revenue" fill="#29ABE2" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -2181,7 +2181,7 @@ export default function MerchantTerminalPage() {
                   <button
                     onClick={loadMoreHistory}
                     disabled={historyFetchLoading}
-                    className="w-full text-center py-2.5 text-xs text-[#1D9E75] hover:text-[#168260] hover:bg-[#E1F5EE] rounded-xl border border-dashed border-[#1D9E75]/30 mt-2 font-bold cursor-pointer transition-colors"
+                    className="w-full text-center py-2.5 text-xs text-[#29ABE2] hover:text-[#1C95C6] hover:bg-[#E8F6FD] rounded-xl border border-dashed border-[#29ABE2]/30 mt-2 font-bold cursor-pointer transition-colors"
                   >
                     {historyFetchLoading ? 'Memuat...' : `Tampilkan Lebih Banyak (${historyTxs.length} dari ${historyTotalCount})`}
                   </button>

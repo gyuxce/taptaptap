@@ -1,4 +1,4 @@
-# EcoTour Tap System
+# WAVR
 
 Sistem pencatatan transaksi NFC & digital souvenir terintegrasi untuk destinasi wisata skala besar (50+ merchant partner) berbasis **Next.js 16 (React 19)**, **Tailwind CSS v4**, dan **Supabase**.
 
@@ -86,12 +86,12 @@ Buka browser di alamat [http://localhost:3000](http://localhost:3000) untuk meng
 
 ## 🎮 Cara Menggunakan Mode Simulasi (Tanpa Supabase)
 
-Jika API Supabase dikosongkan, EcoTour Tap System otomatis memuat demo simulator lokal menggunakan **Local Storage & Session Storage**:
+Jika API Supabase dikosongkan, WAVR otomatis memuat demo simulator lokal menggunakan **Local Storage & Session Storage**:
 1. Masuk ke halaman login utama (`http://localhost:3000/`).
 2. Klik tombol **Demo Quick Fill** yang tersedia di bagian bawah kartu login:
-   - **Admin**: `admin@ecotour.com` (Sandi: `demo1234`)
-   - **Merchant Loket**: `zipline@ecotour.com` (Sandi: `demo1234`)
-   - **Merchant Regular**: `cafe@ecotour.com` (Sandi: `demo1234`)
+   - **Admin**: `admin@wavr.com` (Sandi: `demo1234`)
+   - **Merchant Loket**: `zipline@wavr.com` (Sandi: `demo1234`)
+   - **Merchant Regular**: `cafe@wavr.com` (Sandi: `demo1234`)
 3. Di halaman **Merchant Terminal (`/tap`)**:
    - Jika browser Anda tidak mendukung NFC pembaca (misalnya di komputer desktop), gunakan panel **Gelang Simulator** di bagian bawah.
    - Klik salah satu skenario: **VIP**, **Regular**, **Chip Asing Baru**, **Tag Nonaktif**, atau **Kredit Habis** untuk mensimulasikan tapping instan.
@@ -104,7 +104,7 @@ Jika API Supabase dikosongkan, EcoTour Tap System otomatis memuat demo simulator
 ## ☁️ Panduan Deploy ke Vercel
 
 1. Buat proyek baru di [Vercel](https://vercel.com/new).
-2. Hubungkan ke repositori EcoTour Tap System Anda.
+2. Hubungkan ke repositori WAVR Anda.
 3. Tambahkan **Environment Variables** berikut di pengaturan Vercel:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`

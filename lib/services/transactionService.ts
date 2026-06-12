@@ -68,7 +68,7 @@ export async function logTransaction(
           body: JSON.stringify({
             phone: visitor.phone,
             name: visitor.name,
-            merchantName: 'EcoTour Partner',
+            merchantName: 'WAVR Partner',
             amount: data.amount,
             creditLeft: creditRemaining,
             transactionType: data.type
@@ -120,7 +120,7 @@ export async function logTransaction(
           body: JSON.stringify({
             phone: visitor.phone,
             name: visitor.name,
-            merchantName: merchant?.name || 'EcoTour Partner',
+            merchantName: merchant?.name || 'WAVR Partner',
             amount: data.amount,
             creditLeft: creditRemaining,
             transactionType: data.type

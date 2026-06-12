@@ -140,7 +140,7 @@ export default function AdminTransactionsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
         <div>
-          <span className="text-xs font-bold text-[#1D9E75] uppercase tracking-wider block">
+          <span className="text-xs font-bold text-[#29ABE2] uppercase tracking-wider block">
             Audit Trail Keuangan
           </span>
           <h1 className="text-xl md:text-2xl font-black text-[#1e293b] mt-0.5">
@@ -202,7 +202,7 @@ export default function AdminTransactionsPage() {
               setMerchantFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full px-3.5 py-2.5 text-xs bg-[#f7f7f5] text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#1D9E75]"
+            className="w-full px-3.5 py-2.5 text-xs bg-[#f7f7f5] text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]"
           >
             <option value="all">Semua Merchant ({merchants.length})</option>
             {merchants.map(m => (
@@ -222,7 +222,7 @@ export default function AdminTransactionsPage() {
               setTypeFilter(e.target.value as any);
               setCurrentPage(1);
             }}
-            className="w-full px-3.5 py-2.5 text-xs bg-[#f7f7f5] text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#1D9E75]"
+            className="w-full px-3.5 py-2.5 text-xs bg-[#f7f7f5] text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]"
           >
             <option value="all">Semua Jenis Tap</option>
             <option value="entry">Entry (Tap Pintu Masuk)</option>
@@ -242,7 +242,7 @@ export default function AdminTransactionsPage() {
               setDateFrom(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full px-3.5 py-2 text-xs bg-[#f7f7f5] text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#1D9E75]"
+            className="w-full px-3.5 py-2 text-xs bg-[#f7f7f5] text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]"
           />
         </div>
 
@@ -258,7 +258,7 @@ export default function AdminTransactionsPage() {
               setDateTo(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full px-3.5 py-2 text-xs bg-[#f7f7f5] text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#1D9E75]"
+            className="w-full px-3.5 py-2 text-xs bg-[#f7f7f5] text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2]"
           />
         </div>
 

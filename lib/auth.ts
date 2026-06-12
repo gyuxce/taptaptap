@@ -4,9 +4,9 @@ import { Profile } from '@/types';
 import { loginSchema } from './validations';
 
 const SEED_ACCOUNTS = [
-  { email: 'admin@ecotour.com', role: 'admin', merchant_id: null, merchant_type: null },
-  { email: 'zipline@ecotour.com', role: 'merchant', merchant_id: 'm-lok1', merchant_type: 'loket' },
-  { email: 'cafe@ecotour.com', role: 'merchant', merchant_id: 'm-fb1', merchant_type: 'regular' },
+  { email: 'admin@wavr.com', role: 'admin', merchant_id: null, merchant_type: null },
+  { email: 'zipline@wavr.com', role: 'merchant', merchant_id: 'm-lok1', merchant_type: 'loket' },
+  { email: 'cafe@wavr.com', role: 'merchant', merchant_id: 'm-fb1', merchant_type: 'regular' },
 ];
 
 export async function signIn(email: string, password: string) {

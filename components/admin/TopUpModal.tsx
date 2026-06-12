@@ -134,7 +134,7 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
       <form onSubmit={handleConfirm} className="space-y-5 text-left">
         {/* Info Card */}
         <div className="bg-white border border-[#e5e3db] rounded-2xl p-4 flex gap-3.5 items-center">
-          <div className="h-10 w-10 bg-[#E1F5EE] text-[#1D9E75] rounded-xl flex items-center justify-center shrink-0">
+          <div className="h-10 w-10 bg-[#E8F6FD] text-[#29ABE2] rounded-xl flex items-center justify-center shrink-0">
             <Coins className="h-5 w-5" />
           </div>
           <div>
@@ -168,7 +168,7 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
                 key={preset}
                 type="button"
                 onClick={() => applyPreset(preset)}
-                className="py-2 px-1 text-center text-xs font-bold text-[#1D9E75] bg-[#E1F5EE] border border-transparent rounded-xl hover:bg-[#cbeedf] transition-colors cursor-pointer active:scale-95"
+                className="py-2 px-1 text-center text-xs font-bold text-[#29ABE2] bg-[#E8F6FD] border border-transparent rounded-xl hover:bg-[#D5EEFC] transition-colors cursor-pointer active:scale-95"
               >
                 +{preset >= 1000 ? `${preset / 1000}k` : preset}
               </button>
@@ -188,7 +188,7 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
         {typedAmount > 0 && !errors.amount && (
           <div className="p-3 bg-[#fbfbfa] border border-[#e5e3db] rounded-xl flex justify-between items-center text-xs">
             <span className="text-[#64748b] font-bold">Batas Kredit Baru:</span>
-            <span className="font-black text-[#1D9E75] text-sm">
+            <span className="font-black text-[#29ABE2] text-sm">
               {visitor?.credit_limit === 0 ? 'Unlimited' : formatRupiah(newLimit)}
             </span>
           </div>
@@ -220,7 +220,7 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
                     </span>
                   </div>
                   {h.note && (
-                    <span className="text-[9px] text-[#1D9E75] bg-[#E1F5EE] px-1.5 py-0.5 rounded font-semibold max-w-[120px] truncate">
+                    <span className="text-[9px] text-[#29ABE2] bg-[#E8F6FD] px-1.5 py-0.5 rounded font-semibold max-w-[120px] truncate">
                       {h.note}
                     </span>
                   )}
@@ -244,7 +244,7 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
             type="submit"
             variant="primary"
             loading={loading}
-            className="flex-1 bg-[#1D9E75] hover:bg-[#168260]"
+            className="flex-1 bg-[#29ABE2] hover:bg-[#1C95C6]"
           >
             Konfirmasi Top Up
           </Button>

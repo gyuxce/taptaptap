@@ -1,10 +1,10 @@
 export const COLORS = {
-  primary: '#1D9E75',
-  primaryLight: '#E1F5EE',
-  background: '#f7f7f5',
-  border: '#e5e3db',
-  text: '#1e293b',
-  textMuted: '#64748b'
+  primary: '#29ABE2',
+  primaryLight: '#E8F6FD',
+  background: '#F8FAFF',
+  border: '#E2EEFF',
+  text: '#1B2340',
+  textMuted: '#64748B'
 } as const;
 
 export const TICKET_TYPES = ['Regular', 'VIP', 'Family', 'Group'] as const;

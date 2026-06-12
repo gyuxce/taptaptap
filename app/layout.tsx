@@ -13,13 +13,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EcoTour Tap System",
-  description: "Sistem Pencatatan Transaksi NFC Souvenir Wisata",
+  title: "WAVR — One Wave, Endless Experience",
+  description: "WAVR adalah sistem tap NFC untuk wisata dan event. Cashless, real-time, effortless.",
   manifest: "/manifest.json",
+  openGraph: {
+    title: "WAVR",
+    description: "One Wave, Endless Experience",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "EcoTour",
+    title: "WAVR",
   },
 };
 
@@ -27,7 +31,7 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#1D9E75",
+  themeColor: "#29ABE2",
 };
 
 export default function RootLayout({
