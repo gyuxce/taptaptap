@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion, AnimatePresence } from 'motion/react';
-import { SmartphoneNfc, Mail, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { SmartphoneNfc, Mail, Lock, AlertTriangle } from 'lucide-react';
 
 import { loginSchema, LoginInput } from '@/lib/validations';
 import { signIn, getSession } from '@/lib/auth';
@@ -20,7 +20,6 @@ export default function LoginPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -150,30 +149,15 @@ export default function LoginPage() {
             {...register('email')}
           />
 
-          <div className="relative">
-            <Input
-              label="Kata Sandi"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="••••••••"
-              error={errors.password?.message}
-              icon={<Lock className="h-4 w-4" />}
-              className="pr-10"
-              disabled={loading}
-              {...register('password')}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              disabled={loading}
-              className="absolute right-3.5 top-[38px] p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer disabled:cursor-not-allowed"
-            >
-              {showPassword ? (
-                <EyeOff className="h-4.5 w-4.5" />
-              ) : (
-                <Eye className="h-4.5 w-4.5" />
-              )}
-            </button>
-          </div>
+          <Input
+            label="Kata Sandi"
+            type="password"
+            placeholder="••••••••"
+            error={errors.password?.message}
+            icon={<Lock className="h-4 w-4" />}
+            disabled={loading}
+            {...register('password')}
+          />
 
           <Button
             type="submit"

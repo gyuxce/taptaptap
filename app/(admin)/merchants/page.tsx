@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Toaster, toast } from '@/components/ui/Toast';
-import { Plus, ToggleLeft, Store, MapPin, Eye, EyeOff, ShieldAlert, Key, Phone, Calendar } from 'lucide-react';
+import { Plus, ToggleLeft, Store, MapPin, ShieldAlert, Key, Phone, Calendar, Pencil, Trash2 } from 'lucide-react';
 
 export default function AdminMerchantsPage() {
   const [merchants, setMerchants] = useState<Merchant[]>([]);
@@ -24,7 +24,8 @@ export default function AdminMerchantsPage() {
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [editMerchantData, setEditMerchantData] = useState<Merchant | null>(null);
+  const [confirmDeleteData, setConfirmDeleteData] = useState<Merchant | null>(null);
 
   // Toggle status dialog state
   const [confirmToggleData, setConfirmToggleData] = useState<{
@@ -108,8 +109,78 @@ export default function AdminMerchantsPage() {
     }
   };
 
+  const handleCreateClick = () => {
+    setEditMerchantData(null);
+    reset({
+      name: '',
+      category: 'F&B',
+      location: '',
+      merchant_type: 'regular',
+      phone: '',
+      owner_email: '',
+      owner_password: 'EcoTour2025!',
+    });
+    setIsCreateModalOpen(true);
+  };
+
+  const handleEditClick = (m: Merchant) => {
+    setEditMerchantData(m);
+    setValue('name', m.name);
+    setValue('category', m.category as any);
+    setValue('location', m.location);
+    setValue('merchant_type', m.merchant_type as any);
+    setValue('phone', m.phone || '');
+    // Pre-fill email and password with dummy values to bypass schema validation
+    setValue('owner_email', 'dummy@email.com');
+    setValue('owner_password', 'dummyPassword123');
+    setIsCreateModalOpen(true);
+  };
+
+  const handleDeleteClick = (m: Merchant) => {
+    setConfirmDeleteData(m);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteData) return;
+    try {
+      const success = await db.deleteMerchant(confirmDeleteData.id);
+      if (success) {
+        toast.success(`Merchant ${confirmDeleteData.name} berhasil dihapus`);
+        await loadMerchants();
+      } else {
+        toast.error('Gagal menghapus merchant');
+      }
+    } catch (err) {
+      toast.error('Terjadi kesalahan saat menghapus merchant');
+    } finally {
+      setConfirmDeleteData(null);
+    }
+  };
+
   const onCreateSubmit = async (data: CreateMerchantInput) => {
     try {
+      if (editMerchantData) {
+        // Edit flow
+        const success = await db.updateMerchant(editMerchantData.id, {
+          name: data.name,
+          category: data.category,
+          location: data.location,
+          phone: data.phone,
+        });
+
+        if (success) {
+          toast.success(`Informasi merchant ${data.name} berhasil diperbarui`);
+          setIsCreateModalOpen(false);
+          setEditMerchantData(null);
+          reset();
+          await loadMerchants();
+        } else {
+          toast.error('Gagal memperbarui merchant');
+        }
+        return;
+      }
+
+      // Create flow
       if (isSupabaseConfigured) {
         // Real API provisioning call
         const res = await fetch('/api/admin/create-merchant', {
@@ -171,7 +242,7 @@ export default function AdminMerchantsPage() {
         await loadMerchants();
       }
     } catch (err) {
-      toast.error('Kendala koneksi, gagal membuat merchant');
+      toast.error('Kendala koneksi, gagal memproses data merchant');
     }
   };
 
@@ -202,7 +273,7 @@ export default function AdminMerchantsPage() {
           </h1>
         </div>
         <Button
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={handleCreateClick}
           className="flex items-center gap-2 text-xs font-bold cursor-pointer"
         >
           <Plus className="h-4.5 w-4.5" /> Tambah Merchant
@@ -267,9 +338,25 @@ export default function AdminMerchantsPage() {
                       onClick={() => setSelectedMerchantDetail(m)}
                       variant="ghost"
                       size="sm"
-                      className="text-[#1D9E75] hover:bg-[#E1F5EE] border border-[#1D9E75]/20 font-bold px-2.5 py-1 rounded-xl"
+                      className="text-[#1D9E75] hover:bg-[#E1F5EE] border border-[#1D9E75]/20 font-bold px-2 py-1 rounded-lg"
                     >
                       Detail
+                    </Button>
+                    <Button
+                      onClick={() => handleEditClick(m)}
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-600 hover:bg-blue-50 border border-blue-200 font-bold px-2 py-1 rounded-lg flex items-center gap-1"
+                    >
+                      <Pencil className="h-3 w-3" /> Edit
+                    </Button>
+                    <Button
+                      onClick={() => handleDeleteClick(m)}
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600 hover:bg-red-50 border border-red-200 font-bold px-2 py-1 rounded-lg flex items-center gap-1"
+                    >
+                      <Trash2 className="h-3 w-3" /> Hapus
                     </Button>
                     <Button
                       onClick={() => handleToggleClick(m)}
@@ -304,9 +391,10 @@ export default function AdminMerchantsPage() {
         isOpen={isCreateModalOpen}
         onClose={() => {
           setIsCreateModalOpen(false);
+          setEditMerchantData(null);
           reset();
         }}
-        title="Daftarkan Merchant Baru"
+        title={editMerchantData ? 'Edit Informasi Partner' : 'Daftarkan Merchant Baru'}
       >
         <form onSubmit={handleSubmit(onCreateSubmit)} className="flex flex-col gap-4 text-left">
           <Input
@@ -359,15 +447,6 @@ export default function AdminMerchantsPage() {
           />
 
           <Input
-            label="Email Owner Merchant *"
-            type="email"
-            placeholder="owner@zipline.com"
-            error={errors.owner_email?.message}
-            disabled={isSubmitting}
-            {...register('owner_email')}
-          />
-
-          <Input
             label="Nomor HP Owner (WhatsApp) *"
             placeholder="Contoh: 081234567890"
             error={errors.phone?.message}
@@ -375,23 +454,24 @@ export default function AdminMerchantsPage() {
             {...register('phone')}
           />
 
-          <div className="relative">
+          <div className={editMerchantData ? 'hidden' : 'flex flex-col gap-4'}>
             <Input
-              label="Kata Sandi Owner"
-              type={showPassword ? 'text' : 'password'}
+              label="Email Owner Merchant *"
+              type="email"
+              placeholder="owner@zipline.com"
+              error={errors.owner_email?.message}
+              disabled={isSubmitting}
+              {...register('owner_email')}
+            />
+
+            <Input
+              label="Kata Sandi Owner *"
+              type="password"
+              placeholder="Minimal 8 karakter"
               error={errors.owner_password?.message}
               disabled={isSubmitting}
-              className="pr-10"
               {...register('owner_password')}
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              disabled={isSubmitting}
-              className="absolute right-3.5 top-[38px] p-1 text-gray-400 hover:text-gray-600 cursor-pointer"
-            >
-              {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
-            </button>
           </div>
 
           <div className="flex gap-2.5 pt-3">
@@ -400,6 +480,7 @@ export default function AdminMerchantsPage() {
               variant="ghost"
               onClick={() => {
                 setIsCreateModalOpen(false);
+                setEditMerchantData(null);
                 reset();
               }}
               disabled={isSubmitting}
@@ -413,7 +494,7 @@ export default function AdminMerchantsPage() {
               disabled={isSubmitting}
               className="w-2/3 text-xs font-bold"
             >
-              Tambah Partner
+              {editMerchantData ? 'Simpan Perubahan' : 'Tambah Partner'}
             </Button>
           </div>
         </form>
@@ -564,6 +645,16 @@ export default function AdminMerchantsPage() {
         title="Ubah Status Merchant"
         message={confirmToggleData ? `Yakin ${confirmToggleData.isActive ? 'nonaktifkan' : 'aktifkan'} merchant ${confirmToggleData.name}? ${confirmToggleData.isActive ? 'Merchant tidak akan bisa mencatat transaksi tap gelang NFC.' : 'Merchant akan aktif kembali untuk tap.'}` : ''}
         confirmLabel={confirmToggleData?.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+      />
+
+      {/* Delete merchant confirmation dialog */}
+      <ConfirmDialog
+        isOpen={confirmDeleteData !== null}
+        onClose={() => setConfirmDeleteData(null)}
+        onConfirm={handleConfirmDelete}
+        title="Hapus Merchant"
+        message={confirmDeleteData ? `Yakin ingin menghapus merchant ${confirmDeleteData.name}? Tindakan ini akan menghapus data merchant dan akun login owner secara permanen.` : ''}
+        confirmLabel="Hapus"
       />
     </div>
   );

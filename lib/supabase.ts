@@ -286,6 +286,60 @@ export const db = {
     return newMerchant;
   },
 
+  updateMerchant: async (id: string, merchantData: { name: string; category: string; location: string; phone: string }): Promise<boolean> => {
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from('merchants')
+        .update({
+          name: merchantData.name,
+          category: merchantData.category,
+          location: merchantData.location,
+          phone: merchantData.phone
+        })
+        .eq('id', id);
+      return !error;
+    }
+    const merchants = await db.getMerchants();
+    const idx = merchants.findIndex(m => m.id === id);
+    if (idx !== -1) {
+      merchants[idx].name = merchantData.name;
+      merchants[idx].category = merchantData.category;
+      merchants[idx].location = merchantData.location;
+      merchants[idx].phone = merchantData.phone;
+      setStorageItem('ecotour_merchants', merchants);
+      return true;
+    }
+    return false;
+  },
+
+  deleteMerchant: async (id: string): Promise<boolean> => {
+    if (isSupabaseConfigured) {
+      const res = await fetch('/api/admin/delete-merchant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const resJson = await res.json();
+      return !!resJson.success;
+    }
+    const merchants = await db.getMerchants();
+    const filtered = merchants.filter(m => m.id !== id);
+    setStorageItem('ecotour_merchants', filtered);
+    
+    // Clean up offline mock credentials and profiles
+    if (typeof window !== 'undefined') {
+      const credentials = JSON.parse(window.localStorage.getItem('ecotour_credentials') || '[]');
+      const filteredCreds = credentials.filter((c: any) => c.merchant_id !== id);
+      window.localStorage.setItem('ecotour_credentials', JSON.stringify(filteredCreds));
+
+      const profiles = JSON.parse(window.localStorage.getItem('ecotour_profiles') || '[]');
+      const filteredProfs = profiles.filter((p: any) => p.merchant_id !== id);
+      window.localStorage.setItem('ecotour_profiles', JSON.stringify(filteredProfs));
+    }
+
+    return true;
+  },
+
   // Transactions
   getTransactions: async (): Promise<Transaction[]> => {
     if (isSupabaseConfigured) {
