@@ -115,18 +115,17 @@ export const VisitorJourneyDrawer: React.FC<VisitorJourneyDrawerProps> = ({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="relative w-full sm:w-[400px] bg-[#f7f7f5] border-l border-[#e5e3db] shadow-2xl z-10 flex flex-col h-full overflow-hidden"
-            style={{ willChange: 'transform' }}
+            className="relative w-full sm:w-[400px] bg-[#F8FAFF] border-l border-[#E2EEFF] shadow-2xl z-10 flex flex-col h-full overflow-hidden"
           >
             {/* Header */}
-            <div className="p-5 bg-white border-b border-[#e5e3db] flex flex-col gap-4">
+            <div className="p-5 bg-white border-b border-[#E2EEFF] flex flex-col gap-4">
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3 text-left">
                   <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-200 font-black flex items-center justify-center text-xs text-indigo-700">
                     {visitor ? visitor.name.substring(0, 2).toUpperCase() : 'WS'}
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-[#1e293b] text-sm leading-tight">
+                    <h3 className="font-extrabold text-[#1B2340] text-sm leading-tight">
                       {visitor?.name}
                     </h3>
                     <div className="mt-1">
@@ -136,7 +135,7 @@ export const VisitorJourneyDrawer: React.FC<VisitorJourneyDrawerProps> = ({
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-[#1e293b] hover:bg-gray-100 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-[#1B2340] hover:bg-[#E8F6FD] transition-colors cursor-pointer"
                 >
                   <X className="h-5 w-5" />
                 </button>

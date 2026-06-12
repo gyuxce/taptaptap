@@ -25,7 +25,7 @@ export const Modal: React.FC<ModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-[#1e293b]/45"
+            className="fixed inset-0 bg-[#1B2340]/45"
           />
 
           {/* Modal Container */}
@@ -50,27 +50,26 @@ export const Modal: React.FC<ModalProps> = ({
               mobile: { y: 0, opacity: 1 }
             }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="relative w-full md:max-w-lg bg-[#f7f7f5] border-t md:border border-[#e5e3db] rounded-t-3xl md:rounded-2xl shadow-2xl z-10 flex flex-col max-h-[92vh] md:max-h-[85vh] overflow-hidden md:animate-none"
+            className="relative w-full md:max-w-lg bg-[#F8FAFF] border-t md:border border-[#E2EEFF] rounded-t-3xl md:rounded-2xl shadow-2xl z-10 flex flex-col max-h-[92vh] md:max-h-[85vh] overflow-hidden md:animate-none"
             style={{
-              transformOrigin: 'bottom center',
-              willChange: 'transform, opacity'
+              transformOrigin: 'bottom center'
             }}
           >
             {/* Mobile Drag Indicator Bar */}
             <div className="flex md:hidden justify-center py-3">
-              <div className="w-12 h-1.5 bg-[#e5e3db] rounded-full cursor-grab active:cursor-grabbing" />
+              <div className="w-12 h-1.5 bg-[#E2EEFF] rounded-full cursor-grab active:cursor-grabbing" />
             </div>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#e5e3db] bg-white">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2EEFF] bg-white">
               {title ? (
-                <h3 className="text-sm md:text-base font-bold text-[#1e293b]">{title}</h3>
+                <h3 className="text-sm md:text-base font-bold text-[#1B2340]">{title}</h3>
               ) : (
                 <div />
               )}
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-[#1e293b] hover:bg-[#f1efe9] transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-[#1B2340] hover:bg-[#E8F6FD] transition-colors cursor-pointer"
               >
                 <X className="h-4.5 w-4.5" />
               </button>
