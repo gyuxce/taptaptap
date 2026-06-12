@@ -37,13 +37,13 @@ export const WavrLogo: React.FC<WavrLogoProps> = ({
             <defs>
               <mask id="wavrWhiteMask">
                 <rect x="0" y="0" width="100" height="100" fill="#FFFFFF" />
-                <path d="M 43,63 A 10,10 0 0,1 57,63" fill="none" stroke="#000000" stroke-width="4.5" stroke-linecap="round" />
-                <path d="M 36.5,56.5 A 19,19 0 0,1 63.5,56.5" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round" />
-                <path d="M 30,50 A 28,28 0 0,1 70,50" fill="none" stroke="#000000" stroke-width="2.5" stroke-linecap="round" />
+                <path d="M 40.8,66.8 A 13,13 0 0,1 59.2,66.8" fill="none" stroke="#000000" stroke-width="5.5" stroke-linecap="round" />
+                <path d="M 32.3,58.3 A 25,25 0 0,1 67.7,58.3" fill="none" stroke="#000000" stroke-width="4.5" stroke-linecap="round" />
+                <path d="M 23.8,49.8 A 37,37 0 0,1 76.2,49.8" fill="none" stroke="#000000" stroke-width="3.5" stroke-linecap="round" />
               </mask>
             </defs>
             <polygon
-              points="50,15 80,32.5 80,67.5 50,85 20,67.5 20,32.5"
+              points="50,5 91,27.5 91,72.5 50,95 9,72.5 9,27.5"
               fill="#FFFFFF"
               stroke="#FFFFFF"
               stroke-width="8"
@@ -60,15 +60,15 @@ export const WavrLogo: React.FC<WavrLogoProps> = ({
               </linearGradient>
             </defs>
             <polygon
-              points="50,15 80,32.5 80,67.5 50,85 20,67.5 20,32.5"
+              points="50,5 91,27.5 91,72.5 50,95 9,72.5 9,27.5"
               fill="url(#wavrIconGrad)"
               stroke="url(#wavrIconGrad)"
               stroke-width="8"
               stroke-linejoin="round"
             />
-            <path d="M 43,63 A 10,10 0 0,1 57,63" fill="none" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" />
-            <path d="M 36.5,56.5 A 19,19 0 0,1 63.5,56.5" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" />
-            <path d="M 30,50 A 28,28 0 0,1 70,50" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" />
+            <path d="M 40.8,66.8 A 13,13 0 0,1 59.2,66.8" fill="none" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round" />
+            <path d="M 32.3,58.3 A 25,25 0 0,1 67.7,58.3" fill="none" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" />
+            <path d="M 23.8,49.8 A 37,37 0 0,1 76.2,49.8" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" />
           </>
         )}
       </svg>
