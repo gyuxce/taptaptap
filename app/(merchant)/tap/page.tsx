@@ -392,8 +392,7 @@ export default function MerchantTerminalPage() {
     }
   }, [isTopUpScanning, processTopUpRFID]);
 
-  const handleConfirmTopUp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleConfirmTopUp = async () => {
     if (!topUpVisitor || !topUpTag || !merchant) return;
     if (!navigator.onLine) {
       toast.error('Top up memerlukan koneksi internet');
@@ -697,6 +696,14 @@ export default function MerchantTerminalPage() {
     setScannedUID('');
     setPaymentAmount('');
     setShowManualAmount(false);
+  };
+
+  const resetTopUpSelection = () => {
+    setTopUpVisitor(null);
+    setTopUpTag(null);
+    setTopUpScannedUID('');
+    setTopUpAmount('');
+    setTopUpNote('');
   };
 
   return (
@@ -1146,6 +1153,26 @@ export default function MerchantTerminalPage() {
             setNewTagUID('');
           }}
           title={activeDrawer === 'register' ? 'Pendaftaran Gelang Baru' : 'Top Up Saldo'}
+          footer={activeDrawer === 'topup' && topUpVisitor && topUpTag ? (
+            <div className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={handleConfirmTopUp}
+                disabled={topUpLoading || !(parseInt(topUpAmount.replace(/\./g, ''), 10) > 0)}
+                className="w-full rounded-xl bg-[#29ABE2] py-3 text-xs font-black text-white shadow-sm transition-colors hover:bg-[#1C95C6] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+              >
+                {topUpLoading ? 'Memproses...' : 'Konfirmasi Top Up'}
+              </button>
+              <button
+                type="button"
+                onClick={resetTopUpSelection}
+                disabled={topUpLoading}
+                className="py-1.5 text-xs font-bold text-[#64748b]"
+              >
+                Batal & Scan Ulang
+              </button>
+            </div>
+          ) : undefined}
         >
           <div className="flex flex-col gap-5 text-left">
             {/* Registration is entered only after the main scanner reads an unknown UID. */}
@@ -1368,29 +1395,6 @@ export default function MerchantTerminalPage() {
                       onChange={(e) => setTopUpNote(e.target.value)}
                     />
 
-                    {/* Actions */}
-                    <div className="flex flex-col gap-2 pt-2">
-                      <button
-                        type="button"
-                        onClick={handleConfirmTopUp}
-                        disabled={topUpLoading || !(parseInt(topUpAmount.replace(/\./g, ''), 10) > 0)}
-                        className="w-full text-xs font-black bg-[#29ABE2] hover:bg-[#1C95C6] focus:ring-[#29ABE2] text-white py-3 rounded-xl transition-all cursor-pointer shadow-sm text-center"
-                      >
-                        {topUpLoading ? 'Memproses...' : 'Konfirmasi Top Up'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTopUpVisitor(null);
-                          setTopUpTag(null);
-                          setTopUpScannedUID('');
-                        }}
-                        disabled={topUpLoading}
-                        className="w-full text-xs font-bold text-gray-500 hover:text-gray-800 text-center py-2.5 cursor-pointer"
-                      >
-                        Batal & Scan Ulang
-                      </button>
-                    </div>
                   </div>
                 )}
               </div>
