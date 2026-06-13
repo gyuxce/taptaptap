@@ -25,16 +25,18 @@ interface TransactionQueryRow {
     amount: number | string;
     created_at: string;
     whatsapp_status: Transaction['whatsapp_status'];
-    rfid_tag?: {
-        visitor?: {
-            name?: string;
-            phone?: string | null;
-            ticket_type?: string;
-        } | null;
-    } | null;
     merchant?: {
         name?: string;
         category?: string;
+    } | null;
+}
+
+interface TransactionTagRow {
+    uid: string;
+    visitor?: {
+        name?: string;
+        phone?: string | null;
+        ticket_type?: string;
     } | null;
 }
 
@@ -120,7 +122,7 @@ export async function fetchTransactions(merchantId: string, filters: Transaction
         const offset = filters.offset || 0;
         let query = supabase
             .from('transactions')
-            .select('*, rfid_tag:rfid_tags(visitor:visitors(name, phone, ticket_type)), merchant:merchants(name, category)', { count: 'exact' });
+            .select('*, merchant:merchants(name, category)', { count: 'exact' });
         if (merchantId !== 'all') {
             query = query.eq('merchant_id', merchantId);
         }
@@ -140,10 +142,29 @@ export async function fetchTransactions(merchantId: string, filters: Transaction
             console.error('[transactionService] error fetching transactions:', error);
             return { transactions: [], total: 0 };
         }
+
+        const rows = (data || []) as unknown as TransactionQueryRow[];
+        const uniqueUids = [...new Set(rows.map(tx => tx.rfid_uid).filter(Boolean))];
+        const visitorByUid = new Map<string, TransactionTagRow['visitor']>();
+
+        if (uniqueUids.length > 0) {
+            const { data: tagData, error: tagError } = await supabase
+                .from('rfid_tags')
+                .select('uid, visitor:visitors(name, phone, ticket_type)')
+                .in('uid', uniqueUids);
+
+            if (tagError) {
+                console.warn('[transactionService] visitor enrichment failed:', tagError);
+            } else {
+                (tagData as unknown as TransactionTagRow[] | null)?.forEach(tag => {
+                    visitorByUid.set(tag.uid, tag.visitor);
+                });
+            }
+        }
+
         // Enrich nested outputs to match TypeScript Transaction interface joins
-        const enriched: Transaction[] = (data || []).map(rawTx => {
-            const tx = rawTx as unknown as TransactionQueryRow;
-            const vInfo = tx.rfid_tag?.visitor;
+        const enriched: Transaction[] = rows.map(tx => {
+            const vInfo = visitorByUid.get(tx.rfid_uid);
             return {
                 id: tx.id,
                 rfid_uid: tx.rfid_uid,

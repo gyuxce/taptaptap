@@ -38,6 +38,7 @@ export function useMerchantHistory(merchantId: string | undefined, pollingEnable
   const [customDateFrom, setCustomDateFrom] = useState('');
   const [customDateTo, setCustomDateTo] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [latestTransactions, setLatestTransactions] = useState<Transaction[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [stats, setStats] = useState({
     today: { count: 0, total: 0 },
@@ -59,12 +60,14 @@ export function useMerchantHistory(merchantId: string | undefined, pollingEnable
     else setLoading(true);
 
     try {
-      const [nextStats, list] = await Promise.all([
+      const [nextStats, list, latestList] = await Promise.all([
         fetchTransactionStats(merchantId),
         fetchTransactions(merchantId, { ...dateRange, limit: 50, offset: 0 }),
+        fetchTransactions(merchantId, { limit: 5, offset: 0 }),
       ]);
       setStats(nextStats);
       setTransactions(list.transactions);
+      setLatestTransactions(latestList.transactions);
       setTotalCount(list.total);
       setOffset(0);
     } catch {
@@ -113,6 +116,7 @@ export function useMerchantHistory(merchantId: string | undefined, pollingEnable
     customDateTo,
     setCustomDateTo,
     transactions,
+    latestTransactions,
     totalCount,
     stats,
     loading,

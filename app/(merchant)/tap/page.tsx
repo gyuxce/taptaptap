@@ -110,6 +110,7 @@ export default function MerchantTerminalPage() {
     customDateTo,
     setCustomDateTo,
     transactions: historyTxs,
+    latestTransactions,
     totalCount: historyTotalCount,
     stats: historyStats,
     loading: historyFetchLoading,
@@ -884,18 +885,18 @@ export default function MerchantTerminalPage() {
             </div>
             
             <div className="space-y-1.5">
-              {historyTxs.slice(0, 5).map((tx) => (
+              {latestTransactions.map((tx) => (
                 <div key={tx.id} className="flex justify-between items-center text-[10px] text-[#1e293b]">
                   <span className="font-bold flex items-center gap-1.5 truncate">
                     <span className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0" />
                     {tx.visitor_name || 'Wisatawan'}
                   </span>
                   <span className="font-semibold text-gray-400 font-mono text-[9px] shrink-0 ml-2">
-                    {tx.type === 'entry' ? 'Masuk' : formatRupiah(tx.amount)} · {new Date(tx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                    {tx.type === 'entry' ? 'Masuk' : formatRupiah(tx.amount)} | {new Date(tx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
               ))}
-              {historyTxs.length === 0 && (
+              {latestTransactions.length === 0 && (
                 <p className="text-[10px] text-gray-400 font-medium py-1 text-center">Belum ada transaksi</p>
               )}
             </div>
@@ -1626,7 +1627,7 @@ export default function MerchantTerminalPage() {
           <div className="flex flex-col gap-5 text-left">
             
             {/* Summary metrics cards */}
-            <div className="grid grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-3.5">
               <div className="col-span-2">
                 <StatCard
                   label="Belanja Hari Ini"

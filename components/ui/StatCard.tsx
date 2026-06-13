@@ -21,7 +21,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   return (
     <div
       className={cn(
-        'bg-white border border-[#e5e3db] rounded-2xl p-6 shadow-xs flex items-center justify-between transition-all duration-200 hover:shadow-md hover:border-gray-300 select-none',
+        'bg-white border border-[#e5e3db] rounded-2xl p-4 sm:p-6 shadow-xs flex items-center justify-between transition-all duration-200 hover:shadow-md hover:border-gray-300 select-none',
         className
       )}
     >
@@ -29,7 +29,7 @@ export const StatCard: React.FC<StatCardProps> = ({
         <span className="text-xs font-bold text-[#64748b] uppercase tracking-wider truncate">
           {label}
         </span>
-        <span className="text-2xl font-black text-[#1e293b] mt-0.5 truncate">
+        <span className="text-xl sm:text-2xl font-black text-[#1e293b] mt-0.5 leading-tight break-words">
           {value}
         </span>
         {subtext && (
