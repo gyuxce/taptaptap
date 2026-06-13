@@ -250,6 +250,12 @@ export default function ReportsPage() {
             });
         });
     }, [chartData]);
+    const activeChartData = useMemo(() => {
+        const activeDays = chartData.filter(item => Object.entries(item).some(([key, val]) => {
+            return key !== 'date' && typeof val === 'number' && val > 0;
+        }));
+        return activeDays.length > 0 ? activeDays : chartData;
+    }, [chartData]);
     // Dropdown merchant toggle logic
     const handleSelectMerchant = (id: string) => {
         setSelectedMerchantIds(prev => {
@@ -406,23 +412,24 @@ export default function ReportsPage() {
       </div>
 
       {/* CHART SECTION */}
-      <div className="bg-white border border-[#e5e3db] rounded-2xl p-5 shadow-sm">
+      <div className="bg-white border border-[#e5e3db] rounded-2xl p-4 sm:p-5 shadow-sm min-w-0">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-black text-slate-800">Tren Pendapatan Harian</h3>
             <p className="text-[10px] text-slate-400 font-bold mt-0.5">
-              Grafik pendapatan harian terhitung dalam rupiah
+              Khusus transaksi belanja; tap masuk tanpa nominal tidak dihitung
             </p>
           </div>
           {filtering && <RefreshCw className="h-4 w-4 text-[#29ABE2] animate-spin"/>}
         </div>
 
-        <div className="h-80 w-full">
-          {chartData.length === 0 ? (<div className="h-full w-full flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-2xl gap-2 text-slate-400">
+        <div className="h-64 sm:h-80 w-full min-w-0">
+          {chartData.length === 0 || hasNoChartRevenue ? (<div className="h-full w-full flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-2xl gap-2 text-slate-400 px-5 text-center">
               <Activity className="h-8 w-8 text-slate-300"/>
-              <span className="text-xs font-bold">Tidak ada data tren untuk filter ini</span>
+              <span className="text-xs font-bold">Belum ada transaksi belanja pada rentang tanggal ini</span>
+              <span className="text-[10px] font-semibold">Transaksi tap masuk tetap tercatat, tetapi nominalnya Rp 0.</span>
             </div>) : (<ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+              <BarChart data={activeChartData} margin={{ top: 10, right: 4, left: -8, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9"/>
                 <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} fontWeight="bold" tickLine={false}/>
                  <YAxis stroke="#94a3b8" fontSize={10} fontWeight="bold" tickLine={false} domain={hasNoChartRevenue ? [0, 10000] : [0, 'auto']} tickFormatter={(val) => val === 0 ? 'Rp 0' : val % 1000 === 0 ? `Rp ${val / 1000}k` : `Rp ${(val / 1000).toFixed(1)}k`}/>
@@ -430,7 +437,7 @@ export default function ReportsPage() {
                 {chartSeries.length > 1 && <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }}/>}
                 
                 {/* Dynamically draw bars */}
-                {chartSeries.length === 0 ? (<Bar dataKey="Revenue" fill="#29ABE2" radius={[4, 4, 0, 0]}/>) : (chartSeries.map((key, idx) => (<Bar key={key} dataKey={key} name={key} stackId="merchant_stack" fill={COLORS[idx % COLORS.length]} radius={[0, 0, 0, 0]} // stacked bars don't need top rounding for middle items
+                {chartSeries.length === 0 ? (<Bar dataKey="Revenue" fill="#29ABE2" radius={[4, 4, 0, 0]} maxBarSize={44} minPointSize={3}/>) : (chartSeries.map((key, idx) => (<Bar key={key} dataKey={key} name={key} stackId="merchant_stack" fill={COLORS[idx % COLORS.length]} radius={[0, 0, 0, 0]} maxBarSize={44} minPointSize={3} // stacked bars don't need top rounding for middle items
             />)))}
               </BarChart>
             </ResponsiveContainer>)}
