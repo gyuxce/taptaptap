@@ -8,7 +8,7 @@ import { Visitor, RFIDTag, CreditTopUp } from '@/types';
 import { topUpCredit, getTopUpHistory } from '@/lib/services/visitorService';
 import { formatRupiah, formatDatetime } from '@/lib/utils';
 import { toast } from '@/components/ui/Toast';
-import { Coins, Plus, History } from 'lucide-react';
+import { CheckCircle2, Coins, Plus, History } from 'lucide-react';
 
 interface TopUpModalProps {
   isOpen: boolean;
@@ -31,6 +31,7 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<CreditTopUp[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [successAmount, setSuccessAmount] = useState<number | null>(null);
 
   const loadRecentTopups = useCallback(async () => {
     if (!visitor) return;
@@ -52,7 +53,9 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
       setAmountStr('');
       setNote('');
       setErrors({});
-      void loadRecentTopups();
+      setSuccessAmount(null);
+      const timer = window.setTimeout(() => void loadRecentTopups(), 180);
+      return () => window.clearTimeout(timer);
     }
   }, [isOpen, loadRecentTopups]);
 
@@ -90,8 +93,7 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
     });
   };
 
-  const handleConfirm = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleConfirm = async () => {
     if (!visitor || !tag) {
       toast.error('Data wisatawan atau gelang RFID tidak valid');
       return;
@@ -112,9 +114,9 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
       // Admin top-up bypasses merchant, so actor is 'admin'
       const res = await topUpCredit(tag.uid, cleanAmount, 'admin', note || undefined);
       if (res.success) {
-        toast.success(`Berhasil top up Rp ${cleanAmount.toLocaleString('id-ID')} untuk ${visitor.name}!`);
-        onSuccess();
-        onClose();
+        setSuccessAmount(cleanAmount);
+        setAmountStr('');
+        setNote('');
       } else {
         toast.error(res.error || 'Gagal melakukan top up');
       }
@@ -128,10 +130,57 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
   const currentLimit = visitor ? visitor.credit_limit : 0;
   const typedAmount = parseInt(amountStr.replace(/\./g, ''), 10) || 0;
   const newLimit = currentLimit + typedAmount;
+  const handleFinish = () => {
+    onClose();
+    onSuccess();
+  };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Top Up Kredit Wisatawan">
-      <form onSubmit={handleConfirm} className="space-y-5 text-left">
+    <Modal
+      deferContent
+      isOpen={isOpen}
+      onClose={loading ? () => undefined : successAmount ? handleFinish : onClose}
+      title={successAmount ? 'Top Up Berhasil' : 'Top Up Kredit Wisatawan'}
+      footer={!successAmount && visitor && tag ? (
+        <div className="flex gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1"
+          >
+            Batal
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={handleConfirm}
+            loading={loading}
+            className="flex-1 bg-[#29ABE2] hover:bg-[#1C95C6]"
+          >
+            Konfirmasi Top Up
+          </Button>
+        </div>
+      ) : successAmount ? (
+        <Button type="button" onClick={handleFinish} className="w-full">
+          Selesai
+        </Button>
+      ) : undefined}
+    >
+      {successAmount ? (
+        <div className="flex flex-col items-center gap-4 py-8 text-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#E8F6FD] text-[#29ABE2]">
+            <CheckCircle2 className="h-10 w-10" />
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-[#1e293b]">Saldo berhasil ditambahkan</h3>
+            <p className="mt-1 text-sm font-bold text-[#29ABE2]">{formatRupiah(successAmount)}</p>
+            <p className="mt-1 text-xs text-[#64748b]">Untuk {visitor?.name}</p>
+          </div>
+        </div>
+      ) : (
+      <div className="space-y-5 text-left">
         {/* Info Card */}
         <div className="bg-white border border-[#e5e3db] rounded-2xl p-4 flex gap-3.5 items-center">
           <div className="h-10 w-10 bg-[#E8F6FD] text-[#29ABE2] rounded-xl flex items-center justify-center shrink-0">
@@ -230,26 +279,8 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex gap-3 pt-4 border-t border-[#e5e3db]">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onClose}
-            className="flex-1"
-          >
-            Batal
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            loading={loading}
-            className="flex-1 bg-[#29ABE2] hover:bg-[#1C95C6]"
-          >
-            Konfirmasi Top Up
-          </Button>
-        </div>
-      </form>
+      </div>
+      )}
     </Modal>
   );
 };

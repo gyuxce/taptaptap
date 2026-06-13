@@ -433,7 +433,13 @@ export default function AdminMerchantsPage() {
               </div>
               <div>
                 <h4 className="text-sm font-black text-[#1e293b]">{selectedMerchantDetail.name}</h4>
-                <p className="text-[10px] text-slate-400 mt-0.5">ID: {selectedMerchantDetail.id}</p>
+                <p
+                  className="text-[10px] text-slate-400 mt-0.5"
+                  title={selectedMerchantDetail.id}
+                >
+                  ID: {selectedMerchantDetail.merchant_type === 'loket' ? 'POS' : 'TRM'}-
+                  {selectedMerchantDetail.id.replace(/-/g, '').slice(0, 8).toUpperCase()}
+                </p>
               </div>
             </div>
 
