@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  SmartphoneNfc, Scan, History, Settings, FilePlus2, 
+  SmartphoneNfc, Scan, History, Settings, CircleDollarSign,
   LogOut, Activity, AlertTriangle, Zap, CheckCircle2, 
   XCircle, RefreshCw, Download, Store
 } from 'lucide-react';
@@ -76,6 +76,7 @@ export default function MerchantTerminalPage() {
   // Success Flash Overlay
   const [showSuccessFlash, setShowSuccessFlash] = useState(false);
   const [successVisitorName, setSuccessVisitorName] = useState('');
+  const [successTitle, setSuccessTitle] = useState('Tap Berhasil Dicatat');
 
   // Credit Error Drawer Details
   const [creditErrorDetails, setCreditErrorDetails] = useState<{
@@ -98,8 +99,7 @@ export default function MerchantTerminalPage() {
   const [isTopUpScanning, setIsTopUpScanning] = useState(false);
   const [, setTopUpNfcError] = useState<string | null>(null);
 
-  // Registration Tab States
-  const [registerStep, setRegisterStep] = useState<1 | 2>(1);
+  // Registration state
   const [newTagUID, setNewTagUID] = useState('');
 
   const {
@@ -492,6 +492,7 @@ export default function MerchantTerminalPage() {
         idempotencyKeyRef.current = null;
         // D. Success Overlay
         setSuccessVisitorName(selectedVisitor?.name || 'Wisatawan');
+        setSuccessTitle(merchant.merchant_type === 'loket' ? 'Tap Masuk Berhasil' : 'Pembayaran Berhasil');
         setActiveDrawer(null);
         setShowSuccessFlash(true);
 
@@ -544,16 +545,14 @@ export default function MerchantTerminalPage() {
       if ('error' in res) {
         toast.error(res.error);
       } else {
-        toast.success('Wisatawan berhasil terdaftar!');
         setSuccessVisitorName(res.visitor.name);
-        setRegisterStep(1);
+        setSuccessTitle('Pendaftaran Berhasil');
         setNewTagUID('');
         resetRegForm();
-        
-        // Success flash trigger
+
+        // Close the registration sheet before showing success feedback.
+        setActiveDrawer(null);
         setShowSuccessFlash(true);
-        // Refresh local paired lists
-        loadMerchantAndConfig(profile?.id || '');
       }
     } catch {
       toast.error('Registrasi gagal');
@@ -665,7 +664,7 @@ export default function MerchantTerminalPage() {
       return 'bg-[#fff1f2]'; // error state
     }
     if (activeDrawer === 'register') {
-      return 'bg-[#f5f3ff]'; // register mode
+      return 'bg-[#E8F6FD]'; // registration mode
     }
     if (activeDrawer === 'topup') {
       return 'bg-[#E8F6FD]'; // top up mode
@@ -705,7 +704,7 @@ export default function MerchantTerminalPage() {
               </motion.div>
               <div className="space-y-1">
                 <h3 className="text-lg font-black text-[#29ABE2] uppercase tracking-wide">
-                  Tap Berhasil Dicatat
+                  {successTitle}
                 </h3>
                 <p className="text-sm font-bold text-[#1e293b]">{successVisitorName}</p>
               </div>
@@ -763,15 +762,16 @@ export default function MerchantTerminalPage() {
           <div className="flex items-center gap-2.5 min-w-0">
             {isEntryGate && (
               <button
-                onClick={() => setActiveDrawer('register')}
+                onClick={() => setActiveDrawer('topup')}
                 className={`p-2 rounded-xl border transition-colors cursor-pointer mr-1.5 ${
-                  activeDrawer === 'register' || activeDrawer === 'topup'
-                    ? 'bg-[#f5f3ff] text-[#7C3AED] border-[#ddd6fe]'
+                  activeDrawer === 'topup'
+                    ? 'bg-[#E8F6FD] text-[#29ABE2] border-[#cce8f5]'
                     : 'bg-white text-gray-400 hover:text-[#1e293b] border-[#e5e3db]'
                 }`}
-                title="Layanan Loket"
+                title="Top Up Saldo"
+                aria-label="Buka layanan top up saldo"
               >
-                <FilePlus2 className="h-4.5 w-4.5" />
+                <CircleDollarSign className="h-4.5 w-4.5" />
               </button>
             )}
             <WavrLogo variant="full" size="sm" className="mr-1.5 shrink-0" />
@@ -825,14 +825,20 @@ export default function MerchantTerminalPage() {
               >
                 <SmartphoneNfc className={`h-11 w-11 ${isScanning ? 'animate-bounce' : ''}`} />
                 <span className="text-[10px] font-black uppercase tracking-widest">
-                  {isScanning ? 'PULSE ON' : 'TAP'}
+                  {isScanning ? 'PULSE ON' : isEntryGate ? 'SCAN' : 'TAP'}
                 </span>
               </button>
             </div>
 
             <div className="space-y-1">
-              <h3 className="text-sm font-black text-[#1e293b]">Tempelkan Souvenir</h3>
-              <p className="text-xs text-[#64748b] font-semibold">Dekatkan gelang atau kalung wisatawan ke HP</p>
+              <h3 className="text-sm font-black text-[#1e293b]">
+                {isEntryGate ? 'Pendaftaran & Tap Masuk' : 'Tempelkan Souvenir'}
+              </h3>
+              <p className="text-xs text-[#64748b] font-semibold">
+                {isEntryGate
+                  ? 'Scan gelang baru untuk pendaftaran, atau gelang terdaftar untuk tap masuk'
+                  : 'Dekatkan gelang atau kalung wisatawan ke HP'}
+              </p>
             </div>
 
             {/* Compatibility Warnings */}
@@ -841,7 +847,7 @@ export default function MerchantTerminalPage() {
                 <AlertTriangle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
                 <div>
                   <p className="font-extrabold">Web NFC Tidak Tersedia</p>
-                  <p className="text-[9px] font-medium text-red-600 mt-0.5">NFC Reader hanya didukung pada Chrome Android. Silakan gunakan panel simulator di bawah.</p>
+                  <p className="text-[9px] font-medium text-red-600 mt-0.5">NFC Reader hanya didukung pada Chrome Android melalui koneksi HTTPS.</p>
                 </div>
               </div>
             )}
@@ -1115,8 +1121,9 @@ export default function MerchantTerminalPage() {
           )}
         </Modal>
 
-        {/* B. LAYANAN LOKET DRAWER (UNIFIED REGISTER & TOP UP) */}
+        {/* B. LAYANAN LOKET DRAWER */}
         <Modal
+          deferContent
           isOpen={activeDrawer === 'register' || activeDrawer === 'topup'}
           onClose={() => {
             setActiveDrawer(null);
@@ -1124,62 +1131,16 @@ export default function MerchantTerminalPage() {
             setTopUpTag(null);
             setTopUpScannedUID('');
             setNewTagUID('');
-            setRegisterStep(1);
           }}
-          title="Layanan Loket"
+          title={activeDrawer === 'register' ? 'Pendaftaran Gelang Baru' : 'Top Up Saldo'}
         >
           <div className="flex flex-col gap-5 text-left">
-            {/* Unified Tabs Bar Header */}
-            <div className="grid grid-cols-2 gap-2 bg-[#f1efe9]/40 p-1 rounded-2xl border border-[#e5e3db]">
-              <button
-                type="button"
-                onClick={() => setActiveDrawer('register')}
-                className={`py-2 text-center text-xs font-black rounded-xl transition-all cursor-pointer ${
-                  activeDrawer === 'register'
-                    ? 'bg-[#7C3AED] text-white shadow-xs'
-                    : 'text-gray-500 hover:text-[#7C3AED]'
-                }`}
-              >
-                Daftar Gelang
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveDrawer('topup')}
-                className={`py-2 text-center text-xs font-black rounded-xl transition-all cursor-pointer ${
-                  activeDrawer === 'topup'
-                    ? 'bg-[#29ABE2] text-white shadow-xs'
-                    : 'text-gray-500 hover:text-[#29ABE2]'
-                }`}
-              >
-                Top Up Saldo
-              </button>
-            </div>
-
-            {/* TAB REGISTER CONTENT */}
+            {/* Registration is entered only after the main scanner reads an unknown UID. */}
             {activeDrawer === 'register' && (
-              <div className="flex flex-col gap-4 text-left animate-fadeIn">
-                {registerStep === 1 ? (
-                  <div className="flex flex-col items-center text-center gap-5 py-6">
-                    <div className="w-24 h-24 rounded-full bg-[#f5f3ff] border border-[#ddd6fe] flex items-center justify-center text-[#7C3AED] shadow-sm relative">
-                      <div className="absolute inset-0 rounded-full border border-[#7C3AED]/20 animate-ping" />
-                      <Scan className="h-9 w-9 animate-pulse" />
-                    </div>
-
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-black text-[#1e293b]">Pindai Chip RFID Baru</h3>
-                      <p className="text-xs text-[#64748b] max-w-xs leading-relaxed font-medium">
-                        Dekatkan gelang souvenir baru yang belum terdaftar ke perangkat scanner.
-                      </p>
-                    </div>
-
-                    <div className="w-full py-3 px-4 border border-[#ddd6fe] bg-[#f5f3ff] rounded-xl text-xs font-bold text-[#7C3AED] text-center">
-                      Menunggu pembacaan NFC...
-                    </div>
-                  </div>
-                ) : (
+              <div className="flex flex-col gap-4 text-left">
                   <form onSubmit={handleRegSubmit(onRegisterSubmit)} className="flex flex-col gap-4 text-left">
                     <div className="border-b border-[#e5e3db] pb-3 mb-1">
-                      <span className="text-[10px] font-bold text-[#7C3AED] uppercase tracking-widest block">
+                      <span className="text-[10px] font-bold text-[#29ABE2] uppercase tracking-widest block">
                         RFID Terpaut
                       </span>
                       <span className="text-xs font-mono font-bold text-[#1e293b] tracking-wider block truncate select-all">
@@ -1191,7 +1152,7 @@ export default function MerchantTerminalPage() {
                       label="Nama Lengkap Wisatawan *"
                       placeholder="Masukkan nama"
                       error={regErrors.name?.message}
-                      icon={<Scan className="h-4 w-4 text-[#7C3AED]" />}
+                      icon={<Scan className="h-4 w-4 text-[#29ABE2]" />}
                       disabled={confirmTapLoading}
                       {...regForm('name')}
                     />
@@ -1211,7 +1172,7 @@ export default function MerchantTerminalPage() {
                       </label>
                       <select
                         disabled={confirmTapLoading}
-                        className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#7C3AED] focus:ring-2 focus:ring-[#f5f3ff] transition-all duration-200"
+                        className="w-full px-4 py-2.5 text-sm bg-white text-[#1e293b] border border-[#e5e3db] rounded-xl outline-none focus:border-[#29ABE2] focus:ring-2 focus:ring-[#E8F6FD] transition-colors duration-150"
                         {...regForm('ticket_type')}
                       >
                         <option value="Regular">Regular</option>
@@ -1235,9 +1196,9 @@ export default function MerchantTerminalPage() {
                         type="button"
                         variant="ghost"
                         onClick={() => {
-                          setRegisterStep(1);
                           setNewTagUID('');
                           resetRegForm();
+                          setActiveDrawer(null);
                         }}
                         disabled={confirmTapLoading}
                         className="w-1/3 text-xs border border-[#e5e3db] font-bold"
@@ -1247,13 +1208,12 @@ export default function MerchantTerminalPage() {
                       <button
                         type="submit"
                         disabled={confirmTapLoading}
-                        className="w-2/3 text-xs font-black bg-[#7C3AED] hover:bg-[#6D28D9] focus:ring-[#7C3AED] text-white py-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                        className="w-2/3 text-xs font-black bg-[#29ABE2] hover:bg-[#1C95C6] focus:ring-[#29ABE2] text-white py-3 rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
                       >
                         {confirmTapLoading ? 'Memproses...' : 'Daftarkan Gelang'}
                       </button>
                     </div>
                   </form>
-                )}
               </div>
             )}
 
@@ -1455,10 +1415,9 @@ export default function MerchantTerminalPage() {
                   type="button"
                   onClick={() => {
                     setNewTagUID(scannedUID);
-                    setRegisterStep(2);
                     setActiveDrawer('register');
                   }}
-                  className="w-full text-xs font-black bg-[#7C3AED] hover:bg-[#6D28D9] focus:ring-[#7C3AED] text-white py-3 rounded-xl transition-all cursor-pointer text-center"
+                  className="w-full text-xs font-black bg-[#29ABE2] hover:bg-[#1C95C6] focus:ring-[#29ABE2] text-white py-3 rounded-xl transition-colors cursor-pointer text-center"
                 >
                   Daftarkan Sekarang
                 </button>
