@@ -179,7 +179,7 @@ export default function AdminMerchantsPage() {
                 return;
             }
             // Real API provisioning call
-            toastId = toast.loading(`Mendaftarkan ${data.name} ke Supabase...`);
+            toastId = toast.loading(`Menyiapkan akun ${data.name}...`);
             setProvisioningMerchant(data.name);
             setIsCreateModalOpen(false);
             const res = await fetch('/api/admin/create-merchant', {
@@ -246,7 +246,7 @@ export default function AdminMerchantsPage() {
           <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-sky-200 border-t-[#29ABE2]" />
           <div>
             <p className="text-xs font-black text-sky-900">Mendaftarkan {provisioningMerchant}</p>
-            <p className="text-[10px] font-medium text-sky-700">Membuat akun login dan profil merchant di Supabase.</p>
+            <p className="text-[10px] font-medium text-sky-700">Menyimpan akun login dan profil merchant ke sistem.</p>
           </div>
         </div>
       )}

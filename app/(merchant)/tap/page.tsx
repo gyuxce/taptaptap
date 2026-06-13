@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  SmartphoneNfc, Scan, History, Settings, CircleDollarSign,
+  SmartphoneNfc, Scan, History, Settings, Plus,
   LogOut, Activity, AlertTriangle, Zap, CheckCircle2, 
   XCircle, RefreshCw, Download, Store
 } from 'lucide-react';
@@ -219,6 +219,8 @@ export default function MerchantTerminalPage() {
   // 4. processScannedRFID Handler
   const processScannedRFID = useCallback(async (uid: string) => {
     if (!uid) return;
+    setNfcError(null);
+    setIsScanning(false);
     setScannedUID(uid);
 
     if (navigator.vibrate) {
@@ -294,7 +296,9 @@ export default function MerchantTerminalPage() {
       await ndef.scan({ signal: controller.signal });
       ndef.onreading = (event: NDEFReadingEvent) => {
         const normalized = normalizeUID(event.serialNumber);
-        processScannedRFID(normalized);
+        setNfcError(null);
+        setIsScanning(false);
+        void processScannedRFID(normalized);
       };
       ndef.onreadingerror = () => {
         toast.error('Gagal membaca tag NFC. Silakan coba lagi.');
@@ -407,14 +411,16 @@ export default function MerchantTerminalPage() {
       const res = await topUpCredit(topUpTag.uid, cleanAmount, merchant.id, topUpNote || undefined);
 
       if (res.success) {
-
         setTopUpSuccessAmount(cleanAmount);
         setTopUpSuccessVisitorName(topUpVisitor.name);
-        
+
         setTopUpVisitor(null);
         setTopUpTag(null);
         setTopUpScannedUID('');
+        setTopUpAmount('');
+        setTopUpNote('');
 
+        setActiveDrawer(null);
         setTopUpSuccessFlash(true);
         loadHistoryData(true);
 
@@ -772,7 +778,7 @@ export default function MerchantTerminalPage() {
                 title="Top Up Saldo"
                 aria-label="Buka layanan top up saldo"
               >
-                <CircleDollarSign className="h-4.5 w-4.5" />
+                <Plus className="h-4.5 w-4.5" />
               </button>
             )}
             <WavrLogo variant="full" size="sm" className="mr-1.5 shrink-0" />
@@ -843,7 +849,7 @@ export default function MerchantTerminalPage() {
             </div>
 
             {/* Compatibility Warnings */}
-            {nfcError && (
+            {nfcError && !activeDrawer && (
               <div className="bg-red-50 border border-red-200 text-[#DC2626] text-[10px] font-bold px-3.5 py-2.5 rounded-2xl flex items-start gap-2 max-w-xs mx-auto text-left leading-normal">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
                 <div>
