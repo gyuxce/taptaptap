@@ -84,6 +84,9 @@ CREATE TABLE transactions (
   amount NUMERIC NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   whatsapp_status TEXT DEFAULT 'not_applicable' CHECK (whatsapp_status IN ('not_applicable','pending','sent','failed')),
+  refunded_at TIMESTAMPTZ,
+  refund_reason TEXT,
+  refunded_by TEXT,
   CONSTRAINT amount_non_negative CHECK (amount >= 0)
 );
 
@@ -114,6 +117,7 @@ CREATE INDEX idx_transactions_merchant_id ON transactions(merchant_id);
 CREATE INDEX idx_transactions_created_at ON transactions(created_at DESC);
 CREATE INDEX idx_transactions_rfid_uid ON transactions(rfid_uid);
 CREATE INDEX idx_transactions_rapid_tap ON transactions(merchant_id, rfid_uid, created_at DESC);
+CREATE INDEX idx_transactions_refunded_at ON transactions(refunded_at);
 CREATE INDEX idx_rfid_tags_uid ON rfid_tags(uid);
 CREATE INDEX idx_visitors_name ON visitors(name);
 CREATE INDEX idx_audit_log_actor ON audit_log(actor_user_id);
@@ -764,3 +768,60 @@ REVOKE ALL ON FUNCTION public.finalize_merchant_provisioning(
 GRANT EXECUTE ON FUNCTION public.finalize_merchant_provisioning(
   UUID, UUID, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT
 ) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.refund_transaction(
+  p_transaction_id TEXT,
+  p_actor_user_id UUID,
+  p_reason TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_transaction transactions%ROWTYPE;
+  v_tag rfid_tags%ROWTYPE;
+  v_visitor visitors%ROWTYPE;
+BEGIN
+  SELECT * INTO v_transaction FROM transactions
+  WHERE id = p_transaction_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TRANSACTION_NOT_FOUND'; END IF;
+  IF v_transaction.type <> 'payment' OR v_transaction.amount <= 0 THEN RAISE EXCEPTION 'NOT_REFUNDABLE'; END IF;
+  IF v_transaction.refunded_at IS NOT NULL THEN RAISE EXCEPTION 'ALREADY_REFUNDED'; END IF;
+  IF length(trim(coalesce(p_reason, ''))) < 3 THEN RAISE EXCEPTION 'REFUND_REASON_REQUIRED'; END IF;
+
+  SELECT * INTO v_tag FROM rfid_tags WHERE uid = v_transaction.rfid_uid;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TAG_NOT_FOUND'; END IF;
+  SELECT * INTO v_visitor FROM visitors WHERE id = v_tag.visitor_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'VISITOR_NOT_FOUND'; END IF;
+
+  UPDATE visitors
+  SET credit_used = greatest(0, credit_used - v_transaction.amount)
+  WHERE id = v_visitor.id RETURNING * INTO v_visitor;
+
+  UPDATE transactions
+  SET refunded_at = now(), refund_reason = trim(p_reason), refunded_by = p_actor_user_id::text
+  WHERE id = p_transaction_id RETURNING * INTO v_transaction;
+
+  INSERT INTO audit_log(action, actor_user_id, merchant_id, target_id, metadata)
+  VALUES (
+    'refund_transaction', p_actor_user_id::text, v_transaction.merchant_id, v_transaction.id,
+    jsonb_build_object(
+      'amount', v_transaction.amount,
+      'reason', v_transaction.refund_reason,
+      'rfid_uid', v_transaction.rfid_uid,
+      'visitor_id', v_visitor.id,
+      'credit_used_after', v_visitor.credit_used
+    )
+  );
+
+  RETURN jsonb_build_object(
+    'transaction', to_jsonb(v_transaction),
+    'visitor_credit_used', v_visitor.credit_used
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.refund_transaction(TEXT, UUID, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.refund_transaction(TEXT, UUID, TEXT) TO service_role;

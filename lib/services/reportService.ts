@@ -51,6 +51,7 @@ interface RevenueTransactionRow {
     } | null;
     merchant?: { name?: string } | null;
     merchant_name?: string;
+    refunded_at?: string | null;
 }
 
 interface RevenueTagRow {
@@ -152,7 +153,7 @@ export async function getRevenueReport(filters: RevenueReportFilters): Promise<R
             const merchantTxs = allTransactions.filter(t => t.merchant_id === m.id);
             const total_taps = merchantTxs.length;
             const total_revenue = merchantTxs
-                .filter(t => t.type === 'payment')
+                .filter(t => t.type === 'payment' && !t.refunded_at)
                 .reduce((sum, t) => sum + Number(t.amount), 0);
             const visitorIds = new Set<string>();
             merchantTxs.forEach(t => {
@@ -203,7 +204,7 @@ export async function getDailyRevenue(dateFrom: string, dateTo: string, merchant
                 ...tx,
                 merchant_name: tx.merchant?.name || 'Unknown'
             };
-        });
+        }).filter(tx => !tx.refunded_at);
         // Filter by merchant IDs if specified
         if (merchantIds && merchantIds.length > 0) {
             allTransactions = allTransactions.filter(t => merchantIds.includes(t.merchant_id));
@@ -274,7 +275,7 @@ export async function generateMerchantCommissionReport(merchantId: string, dateF
             const dayTxs = merchantTxs.filter(t => toLocalDateKey(t.created_at) === dateStr);
             const total_taps = dayTxs.length;
             const total_revenue = dayTxs
-                .filter(t => t.type === 'payment')
+                .filter(t => t.type === 'payment' && !t.refunded_at)
                 .reduce((sum, t) => sum + Number(t.amount), 0);
             const commission = total_revenue * commissionRate;
             const net_payout = total_revenue - commission;
@@ -288,7 +289,7 @@ export async function generateMerchantCommissionReport(merchantId: string, dateF
         });
         const total_taps = merchantTxs.length;
         const total_revenue = merchantTxs
-            .filter(t => t.type === 'payment')
+            .filter(t => t.type === 'payment' && !t.refunded_at)
             .reduce((sum, t) => sum + Number(t.amount), 0);
         const total_commission = total_revenue * commissionRate;
         const total_net_payout = total_revenue - total_commission;

@@ -8,6 +8,7 @@ export interface LogTransactionInput {
     created_at?: string;
     idempotency_key?: string;
     allow_rapid_repeat?: boolean;
+    merchant_name?: string;
 }
 export interface TransactionFilters {
     dateFrom?: string;
@@ -25,6 +26,9 @@ interface TransactionQueryRow {
     amount: number | string;
     created_at: string;
     whatsapp_status: Transaction['whatsapp_status'];
+    refunded_at?: string | null;
+    refund_reason?: string | null;
+    refunded_by?: string | null;
     merchant?: {
         name?: string;
         category?: string;
@@ -88,22 +92,17 @@ export async function logTransaction(data: LogTransactionInput): Promise<{
             // Asynchronous fire-and-forget WA request
             fetch('/api/notify', {
                 method: 'POST',
+                keepalive: true,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     phone: visitor.phone,
-                    name: visitor.name,
-                    merchantName: 'WAVR Partner',
+                    visitorName: visitor.name,
+                    merchantName: data.merchant_name || 'WAVR Partner',
                     amount: data.amount,
                     creditLeft: creditRemaining,
-                    transactionType: data.type
+                    transactionType: data.type,
+                    transactionId: inserted.id,
                 })
-            }).then(async (r) => {
-                const res = await r.json();
-                // Update WA status to database silently
-                await supabase
-                    .from('transactions')
-                    .update({ whatsapp_status: res.success ? 'sent' : 'failed' })
-                    .eq('id', inserted.id);
             }).catch(err => console.warn('[transactionService] WA failed:', err));
         }
         return { transaction: inserted };
@@ -177,6 +176,9 @@ export async function fetchTransactions(merchantId: string, filters: Transaction
                 amount,
                 created_at: tx.created_at,
                 whatsapp_status: tx.whatsapp_status || 'not_applicable',
+                refunded_at: tx.refunded_at,
+                refund_reason: tx.refund_reason,
+                refunded_by: tx.refunded_by,
                 visitor_name: vInfo?.name || 'Unknown',
                 visitor_phone: vInfo?.phone || undefined,
                 ticket_type: vInfo?.ticket_type || 'Regular',

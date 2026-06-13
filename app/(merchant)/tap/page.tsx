@@ -483,6 +483,7 @@ export default function MerchantTerminalPage() {
         merchant_id: merchant.id,
         type: merchant.merchant_type === 'loket' ? 'entry' : 'payment',
         amount: chargeAmount,
+        merchant_name: merchant.name,
         idempotency_key: idempotencyKeyRef.current.key,
         allow_rapid_repeat: bypassDoubleTap,
       });

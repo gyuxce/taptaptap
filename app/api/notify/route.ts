@@ -5,6 +5,7 @@ import { consumeRateLimit } from '@/lib/serverRateLimit';
 import { logger, requestId } from '@/lib/logger';
 export async function POST(req: NextRequest) {
     const correlationId = requestId(req.headers);
+    let notificationTransactionId = '';
     try {
         const profile = await getVerifiedProfile(req);
         if (!profile) {
@@ -27,16 +28,33 @@ export async function POST(req: NextRequest) {
         }
         const body = await req.json();
         const { phone, merchantName, amount, visitorName, transactionId } = body;
+        notificationTransactionId = String(transactionId || '');
         // Sanitization & simple validation
         const cleanPhone = String(phone || '').replace(/[^0-9+]/g, '');
         const cleanMerchant = String(merchantName || 'WAVR Merchant').trim();
         const cleanAmount = Number(amount || 0);
         const cleanVisitorName = String(visitorName || 'Wisatawan').trim();
         const fonnteToken = process.env.FONNTE_TOKEN || '';
+        const updateTransactionStatus = async (status: 'sent' | 'failed') => {
+            if (!notificationTransactionId) return;
+            const { error } = await supabaseAdmin
+                .from('transactions')
+                .update({ whatsapp_status: status })
+                .eq('id', notificationTransactionId);
+            if (error) {
+                logger.error('notification.status_update_failed', {
+                    correlationId,
+                    transactionId: notificationTransactionId,
+                    status,
+                    error,
+                });
+            }
+        };
         // Guard cases
         if (!fonnteToken) {
             console.warn('[api/notify] Skip WA: FONNTE_TOKEN is missing');
-            return NextResponse.json({ success: true, skipped: true, reason: 'missing_token' });
+            await updateTransactionStatus('failed');
+            return NextResponse.json({ success: false, skipped: true, reason: 'missing_token' });
         }
         if (cleanAmount <= 0) {
             return NextResponse.json({ success: true, skipped: true, reason: 'amount_zero' });
@@ -57,7 +75,7 @@ export async function POST(req: NextRequest) {
             formattedPhone = '62' + formattedPhone.replace(/^0+/, '');
         }
         const datetimeStr = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
-        const message = `Halo ${cleanVisitorName} 👋\n\nTransaksi berhasil dicatat!\n📍 Lokasi: ${cleanMerchant}\n💰 Nominal: Rp ${cleanAmount.toLocaleString('id-ID')}\n🕐 Waktu: ${datetimeStr} WIB\n\nTerima kasih telah berkunjung ke WAVR!`;
+        const message = `Halo ${cleanVisitorName},\n\nTransaksi WAVR berhasil.\nMerchant: ${cleanMerchant}\nNominal: Rp ${cleanAmount.toLocaleString('id-ID')}\nWaktu: ${datetimeStr} WIB\n\nJika nominal tidak sesuai, segera hubungi petugas WAVR.`;
         logger.info('notification.dispatch', { correlationId, provider: 'fonnte' });
         const res = await fetch('https://api.fonnte.com/send', {
             method: 'POST',
@@ -74,16 +92,17 @@ export async function POST(req: NextRequest) {
         const resData = await res.json();
         const isSent = !!(res.ok && (resData.status === true || resData.status === 'true' || resData.detail === 'success' || resData.status === 'sent'));
         const status = isSent ? 'sent' : 'failed';
-        if (transactionId) {
-            await supabaseAdmin
-                .from('transactions')
-                .update({ whatsapp_status: status })
-                .eq('id', transactionId);
-        }
-        return NextResponse.json({ success: true, status });
+        await updateTransactionStatus(status);
+        return NextResponse.json({ success: isSent, status });
     }
     catch (err: unknown) {
         logger.error('notification.failed', { correlationId, error: err });
+        if (notificationTransactionId && isSupabaseAdminConfigured) {
+            await supabaseAdmin
+                .from('transactions')
+                .update({ whatsapp_status: 'failed' })
+                .eq('id', notificationTransactionId);
+        }
         const message = err instanceof Error ? err.message : 'Unknown error';
         return NextResponse.json({ error: 'Internal Server Error: ' + message }, { status: 500 });
     }

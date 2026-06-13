@@ -10,7 +10,9 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { StatCard } from '@/components/ui/StatCard';
 import { Toaster, toast } from '@/components/ui/Toast';
-import { Download, RefreshCw, Calendar, Store, Filter } from 'lucide-react';
+import { Modal } from '@/components/ui/Modal';
+import { detectTransactionAnomalies, anomalyLabel } from '@/lib/transactionAnomaly';
+import { AlertTriangle, Download, RefreshCw, Calendar, Store, Filter, RotateCcw } from 'lucide-react';
 
 export default function AdminTransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -18,6 +20,9 @@ export default function AdminTransactionsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [fetchingList, setFetchingList] = useState(false);
+  const [refundTarget, setRefundTarget] = useState<Transaction | null>(null);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundLoading, setRefundLoading] = useState(false);
 
   // Filters State
   const [merchantFilter, setMerchantFilter] = useState('all');
@@ -83,7 +88,7 @@ export default function AdminTransactionsPage() {
   // Summary Metrics calculations (Calculated across currently filtered local list page)
   const summaryMetrics = useMemo(() => {
     const totalTaps = transactions.length;
-    const paymentTxs = transactions.filter(t => t.type === 'payment');
+    const paymentTxs = transactions.filter(t => t.type === 'payment' && !t.refunded_at);
     const totalRevenue = paymentTxs.reduce((acc, t) => acc + t.amount, 0);
     const avgAmount = paymentTxs.length > 0 ? (totalRevenue / paymentTxs.length) : 0;
 
@@ -93,6 +98,40 @@ export default function AdminTransactionsPage() {
       avgAmount,
     };
   }, [transactions]);
+
+  const anomalyCount = useMemo(() => {
+    return transactions.filter(tx => detectTransactionAnomalies(tx, transactions).length > 0).length;
+  }, [transactions]);
+
+  const handleRefund = async () => {
+    if (!refundTarget || refundReason.trim().length < 3) {
+      toast.error('Tuliskan alasan refund minimal 3 karakter');
+      return;
+    }
+    setRefundLoading(true);
+    try {
+      const response = await fetch('/api/admin/refund-transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionId: refundTarget.id, reason: refundReason.trim() }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        toast.error(result.error || 'Refund gagal diproses');
+        return;
+      }
+      setTransactions(current => current.map(tx => tx.id === refundTarget.id
+        ? { ...tx, refunded_at: new Date().toISOString(), refund_reason: refundReason.trim() }
+        : tx));
+      toast.success(`Refund ${formatRupiah(refundTarget.amount)} berhasil dan saldo wisatawan dikembalikan`);
+      setRefundTarget(null);
+      setRefundReason('');
+    } catch {
+      toast.error('Koneksi bermasalah saat memproses refund');
+    } finally {
+      setRefundLoading(false);
+    }
+  };
 
   // Export to CSV
   const handleExportCSV = () => {
@@ -166,7 +205,7 @@ export default function AdminTransactionsPage() {
       </div>
 
       {/* Summary metrics bar */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           label="Total Tap Terhitung"
           value={`${summaryMetrics.totalTaps} Transaksi`}
@@ -183,6 +222,12 @@ export default function AdminTransactionsPage() {
           label="Rata-rata Per Transaksi"
           value={formatRupiah(summaryMetrics.avgAmount)}
           subtext="Nilai transaksi belanja regular"
+          tone="amber"
+        />
+        <StatCard
+          label="Perlu Ditinjau"
+          value={`${anomalyCount} Transaksi`}
+          subtext="Nominal, pengulangan, atau jam tidak wajar"
           tone="amber"
         />
       </div>
@@ -284,10 +329,14 @@ export default function AdminTransactionsPage() {
                   <th className="py-4 px-2">Tipe</th>
                   <th className="py-4 px-2 text-right">Nominal</th>
                   <th className="py-4 px-4 text-center">Status WA</th>
+                  <th className="py-4 px-2">Pemeriksaan</th>
+                  <th className="py-4 px-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((tx) => (
+                {transactions.map((tx) => {
+                  const anomalies = detectTransactionAnomalies(tx, transactions);
+                  return (
                   <tr key={tx.id} className="border-b border-[#f7f7f5] hover:bg-[#f7f7f5]/30 transition-colors">
                     <td className="py-3 px-4 font-medium text-gray-500">{formatDatetime(tx.created_at)}</td>
                     <td className="py-3 px-2 font-bold text-[#1e293b]">{tx.visitor_name}</td>
@@ -301,7 +350,7 @@ export default function AdminTransactionsPage() {
                       </Badge>
                     </td>
                     <td className={`py-3 px-2 text-right font-black ${tx.type === 'entry' ? 'text-gray-400' : 'text-red-600'}`}>
-                      {tx.type === 'entry' ? 'Entry' : `-${formatRupiah(tx.amount)}`}
+                      {tx.type === 'entry' ? 'Entry' : tx.refunded_at ? `Refund ${formatRupiah(tx.amount)}` : `-${formatRupiah(tx.amount)}`}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <Badge variant={
@@ -324,11 +373,32 @@ export default function AdminTransactionsPage() {
                           : 'Tidak dikirim'}
                       </Badge>
                     </td>
+                    <td className="py-3 px-2">
+                      <div className="flex min-w-[130px] flex-wrap gap-1">
+                        {tx.refunded_at ? (
+                          <Badge variant="neutral">Direfund</Badge>
+                        ) : anomalies.length > 0 ? anomalies.map(anomaly => (
+                          <span key={anomaly} className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] font-bold text-amber-700">
+                            <AlertTriangle className="h-3 w-3" /> {anomalyLabel[anomaly]}
+                          </span>
+                        )) : <span className="text-[10px] font-semibold text-emerald-600">Normal</span>}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {tx.type === 'payment' && !tx.refunded_at ? (
+                        <Button variant="ghost" size="sm" onClick={() => {
+                          setRefundTarget(tx);
+                          setRefundReason('');
+                        }} className="border border-red-200 text-red-600 hover:bg-red-50">
+                          <RotateCcw className="mr-1 h-3.5 w-3.5" /> Refund
+                        </Button>
+                      ) : <span className="text-gray-300">-</span>}
+                    </td>
                   </tr>
-                ))}
+                )})}
                 {transactions.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="text-center py-16 text-gray-400">
+                    <td colSpan={9} className="text-center py-16 text-gray-400">
                       Tidak ada data aktivitas tap transaksi ditemukan.
                     </td>
                   </tr>
@@ -368,6 +438,37 @@ export default function AdminTransactionsPage() {
           </div>
         )}
       </div>
+
+      <Modal
+        isOpen={refundTarget !== null}
+        onClose={() => !refundLoading && setRefundTarget(null)}
+        title="Persetujuan Refund Admin"
+        footer={
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setRefundTarget(null)} disabled={refundLoading} fullWidth>Batal</Button>
+            <Button variant="danger" onClick={handleRefund} loading={refundLoading} fullWidth>Setujui Refund</Button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-sm">
+          <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+            <p className="font-bold text-slate-800">{refundTarget?.visitor_name} - {refundTarget?.merchant_name}</p>
+            <p className="mt-1 text-xl font-black text-red-600">{formatRupiah(refundTarget?.amount || 0)}</p>
+            <p className="mt-1 text-xs text-slate-500">Saldo wisatawan akan dikembalikan dan tindakan ini masuk audit log.</p>
+          </div>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-bold text-slate-700">Alasan refund</span>
+            <textarea
+              value={refundReason}
+              onChange={event => setRefundReason(event.target.value)}
+              maxLength={300}
+              rows={3}
+              placeholder="Contoh: nominal salah dimasukkan merchant"
+              className="w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-[#29ABE2]"
+            />
+          </label>
+        </div>
+      </Modal>
 
     </div>
   );

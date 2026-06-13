@@ -46,6 +46,9 @@ export interface Transaction {
   amount: number
   created_at: string
   whatsapp_status: 'not_applicable' | 'pending' | 'sent' | 'failed'
+  refunded_at?: string | null
+  refund_reason?: string | null
+  refunded_by?: string | null
   // joined fields (tidak di DB, di-compute saat fetch)
   visitor_name?: string
   visitor_phone?: string
