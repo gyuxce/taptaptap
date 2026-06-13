@@ -124,12 +124,34 @@ Set `APP_ENV=staging` pada deployment staging dan `APP_ENV=production` pada
 production. Tambahkan seluruh environment variable ke platform deployment.
 Jangan pernah mengekspos `SUPABASE_SERVICE_ROLE_KEY` ke client atau repository.
 
+Gunakan `.env.staging.example` sebagai daftar variabel untuk deployment staging.
+Di Vercel, buat project staging terpisah atau gunakan Preview Environment yang
+diarahkan ke project Supabase staging. Jangan menggunakan URL, anon key, maupun
+service role key Supabase production pada staging.
+
 ## Monitoring dan Backup
 
 Server menulis structured JSON log dan menangkap uncaught request error melalui
 `instrumentation.ts`. `OBSERVABILITY_WEBHOOK_URL` dapat diarahkan ke collector
 log/error milik tim. Platform seperti Vercel juga dapat mengindeks output JSON
 tersebut.
+
+Sentry telah terpasang dalam mode opsional. Buat project Next.js di Sentry lalu
+isi variabel berikut pada staging dan production:
+
+```bash
+NEXT_PUBLIC_SENTRY_DSN=https://examplePublicKey@o0.ingest.sentry.io/0
+SENTRY_ORG=nama-organisasi
+SENTRY_PROJECT=nama-project
+SENTRY_AUTH_TOKEN=token-upload-source-map
+SENTRY_TRACES_SAMPLE_RATE=0.1
+NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=0.1
+```
+
+`SENTRY_AUTH_TOKEN` hanya untuk environment server/build dan tidak boleh memakai
+prefix `NEXT_PUBLIC_`. Gunakan sample rate `1` di staging untuk pengujian, lalu
+turunkan ke `0.1` atau sesuai volume traffic di production. Jika DSN kosong,
+Sentry otomatis nonaktif dan aplikasi tetap berjalan normal.
 
 Aktifkan Point-in-Time Recovery Supabase untuk production. Tambahkan backup
 terjadwal di luar provider, lalu uji restore secara berkala:

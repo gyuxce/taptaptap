@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -15,7 +16,7 @@ export default function GlobalError({
   const router = useRouter();
 
   useEffect(() => {
-    // Log error to console
+    Sentry.captureException(error);
     console.error('Global Error Boundary caught:', error);
   }, [error]);
 

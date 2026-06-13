@@ -1,7 +1,16 @@
 import type { Instrumentation } from 'next';
+import * as Sentry from '@sentry/nextjs';
 import { logger } from '@/lib/logger';
 
-export function register() {
+export async function register() {
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    await import('./sentry.server.config');
+  }
+
+  if (process.env.NEXT_RUNTIME === 'edge') {
+    await import('./sentry.edge.config');
+  }
+
   logger.info('application.started', {
     environment: process.env.APP_ENV || process.env.NODE_ENV,
     release: process.env.VERCEL_GIT_COMMIT_SHA || 'local',
@@ -9,6 +18,8 @@ export function register() {
 }
 
 export const onRequestError: Instrumentation.onRequestError = async (error, request, context) => {
+  Sentry.captureRequestError(error, request, context);
+
   const payload = {
     route: request.path,
     method: request.method,
