@@ -129,6 +129,18 @@ Di Vercel, buat project staging terpisah atau gunakan Preview Environment yang
 diarahkan ke project Supabase staging. Jangan menggunakan URL, anon key, maupun
 service role key Supabase production pada staging.
 
+Isi `EXPECTED_SUPABASE_PROJECT_REF` dengan bagian project ref dari URL Supabase.
+Contoh untuk `https://abc123.supabase.co`, nilainya adalah `abc123`. Build
+staging/production otomatis gagal jika project ref, label environment, atau
+kredensial wajib tidak cocok.
+
+## Quality Gate
+
+Workflow `.github/workflows/quality.yml` otomatis menjalankan `npm ci`, lint,
+test, dan production build pada setiap pull request serta push ke `main`.
+Aktifkan branch protection di GitHub dan jadikan check **Quality Gate / verify**
+sebagai syarat merge agar perubahan yang gagal verifikasi tidak masuk ke main.
+
 ## Monitoring dan Backup
 
 Server menulis structured JSON log dan menangkap uncaught request error melalui

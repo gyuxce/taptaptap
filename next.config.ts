@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import { validateDeploymentEnv } from "./lib/envValidation";
+
+validateDeploymentEnv(process.env);
 
 const nextConfig: NextConfig = {
   /* config options here */
