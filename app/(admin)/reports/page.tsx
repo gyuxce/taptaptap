@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { db, supabase } from '@/lib/supabase';
 import { Merchant, Transaction } from '@/types';
 import { formatRupiah, formatDatetime } from '@/lib/utils';
-import { getRevenueReport, getDailyRevenue, generateMerchantCommissionReport, RevenueReportItem, DailyRevenueItem } from '@/lib/services/reportService';
+import { getRevenueReport, getDailyRevenue, generateMerchantCommissionReport, toLocalDateRangeIso, RevenueReportItem, DailyRevenueItem } from '@/lib/services/reportService';
 import { generateCSV, TRANSACTION_COLUMNS, COMMISSION_COLUMNS, CSVColumn } from '@/lib/utils/exportUtils';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard } from '@/components/ui/StatCard';
@@ -76,16 +76,17 @@ export default function ReportsPage() {
         if (!isSilent)
             setFiltering(true);
         try {
+            const range = toLocalDateRangeIso(dateFrom, dateTo);
             // 1. Fetch grouped revenue report
             const rep = await getRevenueReport({
-                dateFrom: `${dateFrom}T00:00:00.000Z`,
-                dateTo: `${dateTo}T23:59:59.999Z`,
+                dateFrom: range.dateFrom,
+                dateTo: range.dateTo,
                 merchantIds: selectedMerchantIds.length > 0 ? selectedMerchantIds : undefined,
                 ticketType
             });
             setRevenueReport(rep);
             // 2. Fetch daily chart trends
-            const chart = await getDailyRevenue(`${dateFrom}T00:00:00.000Z`, `${dateTo}T23:59:59.999Z`, selectedMerchantIds.length > 0 ? selectedMerchantIds : undefined);
+            const chart = await getDailyRevenue(dateFrom, dateTo, selectedMerchantIds.length > 0 ? selectedMerchantIds : undefined);
             setChartData(chart);
             if (!isSilent) {
                 toast.success('Laporan berhasil diperbarui');
@@ -128,7 +129,7 @@ export default function ReportsPage() {
     // Export commission sheet for a merchant
     const handleExportCommission = async (merchantId: string, merchantName: string) => {
         try {
-            const rep = await generateMerchantCommissionReport(merchantId, `${dateFrom}T00:00:00.000Z`, `${dateTo}T23:59:59.999Z`);
+            const rep = await generateMerchantCommissionReport(merchantId, dateFrom, dateTo);
             if (!rep) {
                 toast.error('Gagal membuat laporan komisi');
                 return;
@@ -149,32 +150,45 @@ export default function ReportsPage() {
     const handleExportAllTransactions = async () => {
         try {
             let txs: Transaction[] = [];
+            const range = toLocalDateRangeIso(dateFrom, dateTo);
             let query = supabase
                 .from('transactions')
-                .select('*, rfid_tag:rfid_tags(visitor:visitors(name, ticket_type)), merchant:merchants(name)')
-                .gte('created_at', `${dateFrom}T00:00:00.000Z`)
-                .lte('created_at', `${dateTo}T23:59:59.999Z`);
+                .select('*, merchant:merchants(name)')
+                .gte('created_at', range.dateFrom)
+                .lte('created_at', range.dateTo);
             if (selectedMerchantIds.length > 0) {
                 query = query.in('merchant_id', selectedMerchantIds);
             }
             const { data, error } = await query.order('created_at', { ascending: false });
             if (error)
                 throw error;
-            txs = (data || []).map(rawTx => {
-                const tx = rawTx as unknown as {
-                    id: string;
-                    rfid_uid: string;
-                    merchant_id: string;
-                    type: Transaction['type'];
-                    amount: number | string;
-                    created_at: string;
-                    whatsapp_status: Transaction['whatsapp_status'];
-                    rfid_tag?: {
-                        visitor?: { name?: string; ticket_type?: string } | null;
-                    } | null;
-                    merchant?: { name?: string } | null;
-                };
-                const vInfo = tx.rfid_tag?.visitor;
+            const rows = (data || []) as unknown as Array<{
+                id: string;
+                rfid_uid: string;
+                merchant_id: string;
+                type: Transaction['type'];
+                amount: number | string;
+                created_at: string;
+                whatsapp_status: Transaction['whatsapp_status'];
+                merchant?: { name?: string } | null;
+            }>;
+            const uniqueUids = [...new Set(rows.map(tx => tx.rfid_uid).filter(Boolean))];
+            const visitorByUid = new Map<string, { name?: string; ticket_type?: string }>();
+            if (uniqueUids.length > 0) {
+                const { data: tagData, error: tagError } = await supabase
+                    .from('rfid_tags')
+                    .select('uid, visitor:visitors(name, ticket_type)')
+                    .in('uid', uniqueUids);
+                if (tagError)
+                    throw tagError;
+                (tagData || []).forEach(tag => {
+                    const visitor = tag.visitor as unknown as { name?: string; ticket_type?: string } | null;
+                    if (visitor)
+                        visitorByUid.set(tag.uid, visitor);
+                });
+            }
+            txs = rows.map(tx => {
+                const vInfo = visitorByUid.get(tx.rfid_uid);
                 return {
                     id: tx.id,
                     rfid_uid: tx.rfid_uid,

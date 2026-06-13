@@ -37,6 +37,7 @@ export interface CommissionReport {
 }
 
 interface RevenueTransactionRow {
+    rfid_uid: string;
     merchant_id: string;
     type: Transaction['type'];
     amount: number | string;
@@ -49,6 +50,21 @@ interface RevenueTransactionRow {
     } | null;
     merchant?: { name?: string } | null;
     merchant_name?: string;
+}
+
+interface RevenueTagRow {
+    uid: string;
+    visitor_id?: string | null;
+    visitor?: { ticket_type?: string } | null;
+}
+
+export function toLocalDateRangeIso(dateFrom: string, dateTo: string) {
+    const start = new Date(`${dateFrom}T00:00:00`);
+    const end = new Date(`${dateTo}T23:59:59.999`);
+    return {
+        dateFrom: start.toISOString(),
+        dateTo: end.toISOString()
+    };
 }
 // Helper: Get list of dates in range YYYY-MM-DD
 function getDatesInRange(dateFrom: string, dateTo: string): string[] {
@@ -63,6 +79,14 @@ function getDatesInRange(dateFrom: string, dateTo: string): string[] {
         current.setDate(current.getDate() + 1);
     }
     return dates;
+}
+
+function toLocalDateKey(value: string) {
+    const date = new Date(value);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 // Helper: Format YYYY-MM-DD to DD/MM
 function formatDateDDMM(dateStr: string): string {
@@ -87,7 +111,7 @@ export async function getRevenueReport(filters: RevenueReportFilters): Promise<R
         // Fetch transactions in date range
         const query = supabase
             .from('transactions')
-            .select('*, rfid_tag:rfid_tags(visitor_id, visitor:visitors(ticket_type))')
+            .select('*')
             .gte('created_at', filters.dateFrom)
             .lte('created_at', filters.dateTo);
         const { data: txsData, error } = await query;
@@ -95,9 +119,26 @@ export async function getRevenueReport(filters: RevenueReportFilters): Promise<R
             console.error('[reportService] error getRevenueReport:', error);
             return [];
         }
-        allTransactions = (txsData || []).map(rawTx => {
-            const tx = rawTx as unknown as RevenueTransactionRow;
-            const rfidTag = tx.rfid_tag;
+        const transactionRows = (txsData || []) as unknown as RevenueTransactionRow[];
+        const uniqueUids = [...new Set(transactionRows.map(tx => tx.rfid_uid).filter(Boolean))];
+        const tagByUid = new Map<string, RevenueTagRow>();
+
+        if (uniqueUids.length > 0) {
+            const { data: tagData, error: tagError } = await supabase
+                .from('rfid_tags')
+                .select('uid, visitor_id, visitor:visitors(ticket_type)')
+                .in('uid', uniqueUids);
+            if (tagError) {
+                console.warn('[reportService] RFID enrichment failed:', tagError);
+            } else {
+                (tagData as unknown as RevenueTagRow[] | null)?.forEach(tag => {
+                    tagByUid.set(tag.uid, tag);
+                });
+            }
+        }
+
+        allTransactions = transactionRows.map(tx => {
+            const rfidTag = tagByUid.get(tx.rfid_uid);
             return {
                 ...tx,
                 visitor_id: rfidTag?.visitor_id || null,
@@ -148,6 +189,7 @@ export async function getRevenueReport(filters: RevenueReportFilters): Promise<R
  */
 export async function getDailyRevenue(dateFrom: string, dateTo: string, merchantIds?: string[]): Promise<DailyRevenueItem[]> {
     try {
+        const range = toLocalDateRangeIso(dateFrom, dateTo);
         let allTransactions: RevenueTransactionRow[] = [];
         let merchantsList: Merchant[] = [];
         const { data: merchantsData } = await supabase.from('merchants').select('*');
@@ -156,8 +198,8 @@ export async function getDailyRevenue(dateFrom: string, dateTo: string, merchant
             .from('transactions')
             .select('*, merchant:merchants(name)')
             .eq('type', 'payment')
-            .gte('created_at', dateFrom)
-            .lte('created_at', dateTo);
+            .gte('created_at', range.dateFrom)
+            .lte('created_at', range.dateTo);
         if (error) {
             console.error('[reportService] error getDailyRevenue:', error);
             return [];
@@ -178,7 +220,7 @@ export async function getDailyRevenue(dateFrom: string, dateTo: string, merchant
         // Group transactions by date and merchant name
         const dailyData: DailyRevenueItem[] = dateList.map(dateStr => {
             const dateFormatted = formatDateDDMM(dateStr);
-            const dayTxs = allTransactions.filter(t => t.created_at.startsWith(dateStr));
+            const dayTxs = allTransactions.filter(t => toLocalDateKey(t.created_at) === dateStr);
             const item: DailyRevenueItem = {
                 date: dateFormatted
             };
@@ -211,6 +253,7 @@ export async function getDailyRevenue(dateFrom: string, dateTo: string, merchant
 export async function generateMerchantCommissionReport(merchantId: string, dateFrom: string, dateTo: string, commissionRate: number = 0.10 // 10% default commission
 ): Promise<CommissionReport | null> {
     try {
+        const range = toLocalDateRangeIso(dateFrom, dateTo);
         let merchant: Merchant | null = null;
         let merchantTxs: Transaction[] = [];
         const { data: mData } = await supabase
@@ -225,8 +268,8 @@ export async function generateMerchantCommissionReport(merchantId: string, dateF
             .from('transactions')
             .select('*')
             .eq('merchant_id', merchantId)
-            .gte('created_at', dateFrom)
-            .lte('created_at', dateTo);
+            .gte('created_at', range.dateFrom)
+            .lte('created_at', range.dateTo);
         if (error) {
             console.error('[reportService] error generateMerchantCommissionReport:', error);
             return null;
@@ -235,7 +278,7 @@ export async function generateMerchantCommissionReport(merchantId: string, dateF
         const dateList = getDatesInRange(dateFrom, dateTo);
         // Group by day for breakdown
         const breakdown: CommissionReportBreakdown[] = dateList.map(dateStr => {
-            const dayTxs = merchantTxs.filter(t => t.created_at.startsWith(dateStr));
+            const dayTxs = merchantTxs.filter(t => toLocalDateKey(t.created_at) === dateStr);
             const total_taps = dayTxs.length;
             const total_revenue = dayTxs
                 .filter(t => t.type === 'payment')

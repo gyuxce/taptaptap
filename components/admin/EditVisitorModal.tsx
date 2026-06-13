@@ -197,7 +197,7 @@ export const EditVisitorModal: React.FC<EditVisitorModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Edit Wisatawan">
+    <Modal deferContent isOpen={isOpen} onClose={onClose} title="Edit Wisatawan">
       {/* Tabs Selector */}
       <div className="flex border-b border-[#e5e3db] -mx-6 -mt-6 mb-6 bg-white px-6">
         <button
