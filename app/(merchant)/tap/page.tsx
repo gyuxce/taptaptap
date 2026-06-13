@@ -683,12 +683,12 @@ export default function MerchantTerminalPage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-900 md:py-8 flex items-center justify-center font-sans">
+    <div className="min-h-[100dvh] w-full bg-[#f7f7f5] lg:bg-slate-900 lg:py-8 flex items-center justify-center font-sans overflow-hidden">
       <Toaster position="top-center" richColors />
       
       {/* Emulated Mobile Frame container */}
       <div 
-        className={`w-full md:max-w-[448px] md:h-[860px] md:rounded-[40px] md:border-[10px] md:border-slate-800 md:shadow-2xl md:overflow-hidden flex flex-col relative h-[100dvh] max-h-screen select-none ${getContainerBg()}`}
+        className={`w-full h-[100dvh] max-h-[100dvh] lg:max-w-[448px] lg:h-[860px] lg:max-h-[calc(100dvh-4rem)] lg:rounded-[40px] lg:border-[10px] lg:border-slate-800 lg:shadow-2xl lg:overflow-hidden flex flex-col relative select-none ${getContainerBg()}`}
         style={{ transition: 'background-color 0.3s ease' }}
       >
         
