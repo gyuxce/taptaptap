@@ -389,60 +389,8 @@ export default function AdminDashboardPage() {
             <Badge variant="success">LIVE UPDATE</Badge>
           </div>
 
-          <div className="grid gap-2 md:hidden">
-            {transactions.slice(0, 10).map((tx) => (
-              <div key={tx.id} className="rounded-xl border border-[#e5e3db] bg-[#fbfbfa] p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-black text-[#1e293b]">
-                      {tx.visitor_name || 'Wisatawan'}
-                    </p>
-                    <p className="mt-0.5 truncate text-[10px] font-semibold text-[#64748b]">
-                      {tx.merchant_name || 'Merchant'}
-                    </p>
-                  </div>
-                  <span className={`shrink-0 text-xs font-black ${tx.type === 'entry' ? 'text-[#29ABE2]' : 'text-red-600'}`}>
-                    {tx.type === 'entry' ? 'Entry' : `-${formatRupiah(tx.amount)}`}
-                  </span>
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-2 border-t border-[#e5e3db] pt-2">
-                  <span className="text-[9px] font-medium text-gray-500">
-                    {formatDatetime(tx.created_at)}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <Badge variant={tx.type === 'entry' ? 'VIP' : 'Regular'}>
-                      {tx.type === 'entry' ? 'Entry' : 'Belanja'}
-                    </Badge>
-                    <Badge variant={
-                      tx.whatsapp_status === 'sent'
-                        ? 'success'
-                        : tx.whatsapp_status === 'pending'
-                        ? 'pending'
-                        : tx.whatsapp_status === 'failed'
-                        ? 'error'
-                        : 'neutral'
-                    }>
-                      {tx.whatsapp_status === 'sent'
-                        ? 'Sent'
-                        : tx.whatsapp_status === 'pending'
-                        ? 'Pending'
-                        : tx.whatsapp_status === 'failed'
-                        ? 'Failed'
-                        : 'N/A'}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {transactions.length === 0 && (
-              <div className="py-10 text-center text-xs text-gray-400">
-                Belum ada data transaksi
-              </div>
-            )}
-          </div>
-
-          <div className="hidden overflow-x-auto min-w-0 md:block">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[720px] text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-[#e5e3db] text-[#64748b] font-bold uppercase tracking-wider">
                   <th className="pb-3.5">Waktu</th>
