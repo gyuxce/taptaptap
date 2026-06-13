@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { toLocalDateRangeIso } from '@/lib/reportDate';
 import { Transaction, Merchant } from '@/types';
 export interface RevenueReportFilters {
     dateFrom: string;
@@ -58,14 +59,6 @@ interface RevenueTagRow {
     visitor?: { ticket_type?: string } | null;
 }
 
-export function toLocalDateRangeIso(dateFrom: string, dateTo: string) {
-    const start = new Date(`${dateFrom}T00:00:00`);
-    const end = new Date(`${dateTo}T23:59:59.999`);
-    return {
-        dateFrom: start.toISOString(),
-        dateTo: end.toISOString()
-    };
-}
 // Helper: Get list of dates in range YYYY-MM-DD
 function getDatesInRange(dateFrom: string, dateTo: string): string[] {
     const dates: string[] = [];

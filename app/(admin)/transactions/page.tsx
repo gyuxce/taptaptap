@@ -319,7 +319,9 @@ export default function AdminTransactionsPage() {
                           ? 'Pending'
                           : tx.whatsapp_status === 'failed'
                           ? 'Failed'
-                          : 'N/A'}
+                          : tx.type === 'entry'
+                          ? 'Tidak berlaku'
+                          : 'Tidak dikirim'}
                       </Badge>
                     </td>
                   </tr>

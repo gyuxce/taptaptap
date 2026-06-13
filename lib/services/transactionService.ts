@@ -165,14 +165,18 @@ export async function fetchTransactions(merchantId: string, filters: Transaction
         // Enrich nested outputs to match TypeScript Transaction interface joins
         const enriched: Transaction[] = rows.map(tx => {
             const vInfo = visitorByUid.get(tx.rfid_uid);
+            const amount = Number(tx.amount || 0);
+            const type = tx.type === 'entry' || tx.type === 'payment'
+                ? tx.type
+                : amount > 0 ? 'payment' : 'entry';
             return {
                 id: tx.id,
                 rfid_uid: tx.rfid_uid,
                 merchant_id: tx.merchant_id,
-                type: tx.type,
-                amount: Number(tx.amount),
+                type,
+                amount,
                 created_at: tx.created_at,
-                whatsapp_status: tx.whatsapp_status,
+                whatsapp_status: tx.whatsapp_status || 'not_applicable',
                 visitor_name: vInfo?.name || 'Unknown',
                 visitor_phone: vInfo?.phone || undefined,
                 ticket_type: vInfo?.ticket_type || 'Regular',

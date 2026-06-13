@@ -89,13 +89,17 @@ export default function AdminVisitorsPage() {
             });
             const resJson = await res.json();
             if (resJson.success) {
-                toast.success(`Kredit ${confirmResetData.name} berhasil direset!`);
+                setVisitors(current => current.map(visitor => visitor.id === confirmResetData.id
+                    ? {
+                        ...visitor,
+                        credit_used: Number(resJson.visitor?.credit_used ?? visitor.credit_limit),
+                    }
+                    : visitor));
+                toast.success(`Sisa kredit ${confirmResetData.name} berhasil direset menjadi Rp 0`);
             }
             else {
                 toast.error(resJson.error || 'Gagal reset kredit');
             }
-            // reload
-            await loadData();
         }
         catch {
             toast.error('Terjadi kendala saat reset');
@@ -276,7 +280,7 @@ export default function AdminVisitorsPage() {
       </div>
 
       {/* Credit reset ConfirmDialog */}
-      <ConfirmDialog isOpen={confirmResetData !== null} onClose={() => setConfirmResetData(null)} onConfirm={handleConfirmReset} loading={resetLoading} title="Reset Kredit Wisatawan" message={confirmResetData ? `Yakin reset kredit ${confirmResetData.name}? Sisa kredit sebesar ${formatRupiah(confirmResetData.remaining)} akan kembali menjadi 0.` : ''} confirmLabel="Reset Kredit"/>
+      <ConfirmDialog isOpen={confirmResetData !== null} onClose={() => setConfirmResetData(null)} onConfirm={handleConfirmReset} loading={resetLoading} title="Reset Sisa Kredit" message={confirmResetData ? `Yakin reset sisa kredit ${confirmResetData.name}? Sisa sebesar ${formatRupiah(confirmResetData.remaining)} akan menjadi Rp 0 dan tidak dapat dipakai lagi.` : ''} confirmLabel="Reset ke Rp 0"/>
 
       {/* Edit Visitor Modal */}
       <EditVisitorModal isOpen={isEditOpen} onClose={() => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toLocalDateRangeIso } from '@/lib/services/reportService';
+import { toLocalDateRangeIso } from '@/lib/reportDate';
 
 describe('report date range', () => {
   it('covers the entire selected local calendar day', () => {

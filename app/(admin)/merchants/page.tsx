@@ -18,6 +18,7 @@ export default function AdminMerchantsPage() {
     const [merchants, setMerchants] = useState<Merchant[]>([]);
     const [loading, setLoading] = useState(true);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
     // Modals state
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editMerchantData, setEditMerchantData] = useState<Merchant | null>(null);
@@ -127,11 +128,13 @@ export default function AdminMerchantsPage() {
     const handleConfirmDelete = async () => {
         if (!confirmDeleteData)
             return;
+        const merchantToDelete = confirmDeleteData;
+        setDeleteLoading(true);
         try {
-            const success = await db.deleteMerchant(confirmDeleteData.id);
+            const success = await db.deleteMerchant(merchantToDelete.id);
             if (success) {
-                toast.success(`Merchant ${confirmDeleteData.name} berhasil dihapus`);
-                await loadMerchants();
+                setMerchants(current => current.filter(merchant => merchant.id !== merchantToDelete.id));
+                toast.success(`Merchant ${merchantToDelete.name} berhasil dihapus dari sistem`);
             }
             else {
                 toast.error('Gagal menghapus merchant');
@@ -141,6 +144,7 @@ export default function AdminMerchantsPage() {
             toast.error('Terjadi kesalahan saat menghapus merchant');
         }
         finally {
+            setDeleteLoading(false);
             setConfirmDeleteData(null);
         }
     };
@@ -502,6 +506,6 @@ export default function AdminMerchantsPage() {
       <ConfirmDialog isOpen={confirmToggleData !== null} onClose={() => setConfirmToggleData(null)} onConfirm={handleConfirmToggle} title="Ubah Status Merchant" message={confirmToggleData ? `Yakin ${confirmToggleData.isActive ? 'nonaktifkan' : 'aktifkan'} merchant ${confirmToggleData.name}? ${confirmToggleData.isActive ? 'Merchant tidak akan bisa mencatat transaksi tap gelang NFC.' : 'Merchant akan aktif kembali untuk tap.'}` : ''} confirmLabel={confirmToggleData?.isActive ? 'Nonaktifkan' : 'Aktifkan'}/>
 
       {/* Delete merchant confirmation dialog */}
-      <ConfirmDialog isOpen={confirmDeleteData !== null} onClose={() => setConfirmDeleteData(null)} onConfirm={handleConfirmDelete} title="Hapus Merchant" message={confirmDeleteData ? `Yakin ingin menghapus merchant ${confirmDeleteData.name}? Tindakan ini akan menghapus data merchant dan akun login owner secara permanen.` : ''} confirmLabel="Hapus"/>
+      <ConfirmDialog isOpen={confirmDeleteData !== null} onClose={() => setConfirmDeleteData(null)} onConfirm={handleConfirmDelete} loading={deleteLoading} title="Hapus Merchant" message={confirmDeleteData ? `Yakin ingin menghapus merchant ${confirmDeleteData.name}? Tindakan ini akan menghapus data merchant dan akun login owner secara permanen.` : ''} confirmLabel={deleteLoading ? 'Menghapus...' : 'Hapus'}/>
     </div>);
 }

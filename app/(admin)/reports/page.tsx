@@ -3,7 +3,8 @@ import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { db, supabase } from '@/lib/supabase';
 import { Merchant, Transaction } from '@/types';
 import { formatRupiah, formatDatetime } from '@/lib/utils';
-import { getRevenueReport, getDailyRevenue, generateMerchantCommissionReport, toLocalDateRangeIso, RevenueReportItem, DailyRevenueItem } from '@/lib/services/reportService';
+import { getRevenueReport, getDailyRevenue, generateMerchantCommissionReport, RevenueReportItem, DailyRevenueItem } from '@/lib/services/reportService';
+import { toLocalDateRangeIso } from '@/lib/reportDate';
 import { generateCSV, TRANSACTION_COLUMNS, COMMISSION_COLUMNS, CSVColumn } from '@/lib/utils/exportUtils';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard } from '@/components/ui/StatCard';
