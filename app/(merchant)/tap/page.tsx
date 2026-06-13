@@ -685,6 +685,7 @@ export default function MerchantTerminalPage() {
   const registeredByLabel = selectedTag?.registered_by
     ? `Pos ${selectedTag.registered_by.replace(/-/g, '').slice(0, 8).toUpperCase()}`
     : 'Loket';
+  const terminalDisplayId = `TRM-${merchant.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 
   const closeVisitorDrawer = () => {
     setActiveDrawer(null);
@@ -1581,7 +1582,9 @@ export default function MerchantTerminalPage() {
               <div className="space-y-2.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Terminal ID</span>
-                  <span className="font-mono font-bold text-[#1e293b] select-all">{merchant.id}</span>
+                  <span className="font-mono font-bold text-[#1e293b]" title={merchant.id}>
+                    {terminalDisplayId}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Nama Partner</span>
