@@ -682,6 +682,19 @@ export default function MerchantTerminalPage() {
     return 'bg-[#f7f7f5]'; // normal/idle
   };
 
+  const registeredByLabel = selectedTag?.registered_by
+    ? `Pos ${selectedTag.registered_by.replace(/-/g, '').slice(0, 8).toUpperCase()}`
+    : 'Loket';
+
+  const closeVisitorDrawer = () => {
+    setActiveDrawer(null);
+    setSelectedVisitor(null);
+    setSelectedTag(null);
+    setScannedUID('');
+    setPaymentAmount('');
+    setShowManualAmount(false);
+  };
+
   return (
     <div className="min-h-[100dvh] w-full bg-[#f7f7f5] lg:bg-slate-900 lg:py-8 flex items-center justify-center font-sans overflow-hidden">
       <Toaster position="top-center" richColors />
@@ -917,18 +930,48 @@ export default function MerchantTerminalPage() {
         {/* A. VISITOR CARD DRAWER */}
         <Modal
           isOpen={activeDrawer === 'visitor'}
-          onClose={() => {
-            setActiveDrawer(null);
-            setSelectedVisitor(null);
-            setSelectedTag(null);
-            setScannedUID('');
-            setPaymentAmount('');
-            setShowManualAmount(false);
-          }}
+          onClose={closeVisitorDrawer}
           title="Data Kartu Wisatawan"
+          footer={selectedVisitor && selectedTag ? (
+            <div className="flex flex-col gap-1.5">
+              {(() => {
+                const isValidAmount = Number(paymentAmount) > 0;
+                const isHighlighted = !isEntryGate && isValidAmount;
+
+                return (
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmTap(false)}
+                    disabled={confirmTapLoading || !selectedTag.is_active || (!isEntryGate && !isValidAmount)}
+                    className={`w-full rounded-xl py-3 text-xs font-black uppercase tracking-wider transition-colors ${
+                      isEntryGate
+                        ? 'bg-[#29ABE2] text-white hover:bg-[#1C95C6]'
+                        : isHighlighted
+                        ? 'bg-[#29ABE2] text-white hover:bg-[#1C95C6] shadow-md shadow-[#29ABE2]/25'
+                        : 'cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-400'
+                    }`}
+                  >
+                    {confirmTapLoading
+                      ? 'Memproses...'
+                      : isEntryGate
+                      ? 'Konfirmasi Tap Masuk'
+                      : `Konfirmasi Pembayaran ${formatRupiah(Number(paymentAmount || 0))}`}
+                  </button>
+                );
+              })()}
+              <button
+                type="button"
+                onClick={closeVisitorDrawer}
+                disabled={confirmTapLoading}
+                className="py-1.5 text-xs font-bold text-[#64748b]"
+              >
+                Tutup
+              </button>
+            </div>
+          ) : undefined}
         >
           {selectedVisitor && selectedTag && (
-            <div className="flex flex-col gap-4 text-left">
+            <div className="flex flex-col gap-3 text-left">
               
               {/* Header Visitor Profile */}
               <div className="flex items-center gap-3 bg-white p-3 border border-[#e5e3db] rounded-2xl">
@@ -958,7 +1001,12 @@ export default function MerchantTerminalPage() {
                 </div>
                 <div className="flex justify-between">
                   <span>Terdaftar Oleh Pos</span>
-                  <span className="font-bold text-[#1e293b]">{selectedTag.registered_by || 'Loket'}</span>
+                  <span
+                    className="font-bold text-[#1e293b]"
+                    title={selectedTag.registered_by || 'Loket'}
+                  >
+                    {registeredByLabel}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Tanggal Masuk</span>
@@ -1077,52 +1125,6 @@ export default function MerchantTerminalPage() {
                   )}
                 </div>
               )}
-
-              {/* Actions submit/confirm */}
-              <div className="flex flex-col gap-2.5 pt-2">
-                {(() => {
-                  const isValidAmount = Number(paymentAmount) > 0;
-                  const isHighlighted = !isEntryGate && isValidAmount;
-
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => handleConfirmTap(false)}
-                      disabled={confirmTapLoading || !selectedTag.is_active || (!isEntryGate && !isValidAmount)}
-                      className={`w-full text-xs py-3.5 font-black uppercase tracking-wider transition-all duration-200 rounded-xl text-center cursor-pointer ${
-                        isEntryGate
-                          ? 'bg-[#29ABE2] text-white hover:bg-[#1C95C6]'
-                          : isHighlighted
-                          ? 'bg-[#29ABE2] text-white hover:bg-[#1C95C6] shadow-md shadow-[#29ABE2]/35 ring-4 ring-[#292929]/25 scale-[1.01]'
-                          : 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed'
-                      }`}
-                    >
-                      {confirmTapLoading 
-                        ? 'Memproses...'
-                        : isEntryGate
-                        ? 'Konfirmasi Tap Masuk'
-                        : `Konfirmasi Pembayaran ${formatRupiah(Number(paymentAmount || 0))}`}
-                    </button>
-                  );
-                })()}
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setActiveDrawer(null);
-                    setSelectedVisitor(null);
-                    setSelectedTag(null);
-                    setScannedUID('');
-                    setPaymentAmount('');
-                    setShowManualAmount(false);
-                  }}
-                  disabled={confirmTapLoading}
-                  className="text-xs font-bold text-[#64748b] hover:text-[#1e293b]"
-                >
-                  Tutup
-                </Button>
-              </div>
 
             </div>
           )}

@@ -7,6 +7,7 @@ interface ModalProps {
   title?: string;
   children: React.ReactNode;
   deferContent?: boolean;
+  footer?: React.ReactNode;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -15,6 +16,7 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   children,
   deferContent = false,
+  footer,
 }) => {
   const [contentReady, setContentReady] = useState(!deferContent);
 
@@ -79,6 +81,12 @@ export const Modal: React.FC<ModalProps> = ({
                 </div>
               )}
             </div>
+
+            {contentReady && footer && (
+              <div className="shrink-0 border-t border-[#E2EEFF] bg-white px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                {footer}
+              </div>
+            )}
           </div>
         </div>
   );
