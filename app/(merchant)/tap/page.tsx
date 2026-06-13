@@ -685,7 +685,10 @@ export default function MerchantTerminalPage() {
   const registeredByLabel = selectedTag?.registered_by
     ? `Pos ${selectedTag.registered_by.replace(/-/g, '').slice(0, 8).toUpperCase()}`
     : 'Loket';
-  const terminalDisplayId = `TRM-${merchant.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+  const terminalDisplayId = `${merchant.merchant_type === 'loket' ? 'POS' : 'TRM'}-${merchant.id
+    .replace(/-/g, '')
+    .slice(0, 8)
+    .toUpperCase()}`;
 
   const closeVisitorDrawer = () => {
     setActiveDrawer(null);
