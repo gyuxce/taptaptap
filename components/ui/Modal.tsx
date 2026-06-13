@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -6,6 +6,7 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
+  deferContent?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -13,7 +14,23 @@ export const Modal: React.FC<ModalProps> = ({
   onClose,
   title,
   children,
+  deferContent = false,
 }) => {
+  const [contentReady, setContentReady] = useState(!deferContent);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setContentReady(!deferContent);
+      return;
+    }
+    if (!deferContent) {
+      setContentReady(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setContentReady(true), 170);
+    return () => window.clearTimeout(timer);
+  }, [deferContent, isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -49,7 +66,18 @@ export const Modal: React.FC<ModalProps> = ({
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto p-6">
-              {children}
+              {contentReady ? children : (
+                <div className="space-y-4 animate-pulse" aria-label="Menyiapkan formulir">
+                  <div className="h-10 rounded-xl bg-slate-100" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="h-10 rounded-xl bg-slate-100" />
+                    <div className="h-10 rounded-xl bg-slate-100" />
+                  </div>
+                  <div className="h-10 rounded-xl bg-slate-100" />
+                  <div className="h-10 rounded-xl bg-slate-100" />
+                  <div className="h-12 rounded-xl bg-slate-100" />
+                </div>
+              )}
             </div>
           </div>
         </div>

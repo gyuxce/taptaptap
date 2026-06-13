@@ -36,6 +36,7 @@ export default function AdminMerchantsPage() {
     } | null>(null);
     // Detail modal state
     const [selectedMerchantDetail, setSelectedMerchantDetail] = useState<Merchant | null>(null);
+    const [provisioningMerchant, setProvisioningMerchant] = useState<string | null>(null);
     // Form setup for create merchant
     const { register, handleSubmit, setValue, reset, formState: { errors, isSubmitting }, } = useForm<CreateMerchantInput>({
         resolver: zodResolver(createMerchantSchema),
@@ -144,9 +145,13 @@ export default function AdminMerchantsPage() {
         }
     };
     const onCreateSubmit = async (data: CreateMerchantInput) => {
+        let toastId: string | number | undefined;
         try {
             if (editMerchantData) {
                 // Edit flow
+                toastId = toast.loading(`Menyimpan perubahan ${data.name}...`);
+                setProvisioningMerchant(data.name);
+                setIsCreateModalOpen(false);
                 const success = await db.updateMerchant(editMerchantData.id, {
                     name: data.name,
                     category: data.category,
@@ -154,18 +159,29 @@ export default function AdminMerchantsPage() {
                     phone: data.phone,
                 });
                 if (success) {
-                    toast.success(`Informasi merchant ${data.name} berhasil diperbarui`);
-                    setIsCreateModalOpen(false);
+                    setMerchants(current => current.map(merchant => merchant.id === editMerchantData.id
+                        ? {
+                            ...merchant,
+                            name: data.name,
+                            category: data.category,
+                            location: data.location,
+                            phone: data.phone,
+                        }
+                        : merchant));
+                    toast.success(`Informasi ${data.name} berhasil diperbarui`, { id: toastId });
                     setEditMerchantData(null);
                     reset();
-                    await loadMerchants();
                 }
                 else {
-                    toast.error('Gagal memperbarui merchant');
+                    toast.error('Gagal memperbarui merchant', { id: toastId });
+                    setIsCreateModalOpen(true);
                 }
                 return;
             }
             // Real API provisioning call
+            toastId = toast.loading(`Mendaftarkan ${data.name} ke Supabase...`);
+            setProvisioningMerchant(data.name);
+            setIsCreateModalOpen(false);
             const res = await fetch('/api/admin/create-merchant', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -182,15 +198,20 @@ export default function AdminMerchantsPage() {
                     pass: data.owner_password,
                     name: data.name,
                 });
-                setIsCreateModalOpen(false);
                 reset();
+                toast.success(`${data.name} berhasil didaftarkan`, { id: toastId });
             }
             else {
-                toast.error(resJson.error || 'Gagal membuat merchant');
+                toast.error(resJson.error || 'Gagal membuat merchant', { id: toastId });
+                setIsCreateModalOpen(true);
             }
         }
         catch {
-            toast.error('Kendala koneksi, gagal memproses data merchant');
+            toast.error('Kendala koneksi, gagal memproses data merchant', toastId ? { id: toastId } : undefined);
+            setIsCreateModalOpen(true);
+        }
+        finally {
+            setProvisioningMerchant(null);
         }
     };
     if (loading) {
@@ -220,6 +241,16 @@ export default function AdminMerchantsPage() {
         </Button>
       </div>
 
+      {provisioningMerchant && (
+        <div className="flex items-center gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-left shadow-xs">
+          <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-sky-200 border-t-[#29ABE2]" />
+          <div>
+            <p className="text-xs font-black text-sky-900">Mendaftarkan {provisioningMerchant}</p>
+            <p className="text-[10px] font-medium text-sky-700">Membuat akun login dan profil merchant di Supabase.</p>
+          </div>
+        </div>
+      )}
+
       {/* Table grid */}
       <div className="bg-white border border-[#e5e3db] rounded-2xl overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
@@ -241,8 +272,11 @@ export default function AdminMerchantsPage() {
                     <Store className="h-4 w-4 text-[#29ABE2]"/> {m.name}
                   </td>
                   <td className="py-3 px-2 text-gray-500 font-semibold">{m.category}</td>
-                  <td className="py-3 px-2 text-[#64748b] font-medium flex items-center gap-1 mt-1">
-                    <MapPin className="h-3.5 w-3.5"/> {m.location}
+                  <td className="py-3 px-2 text-[#64748b] font-medium">
+                    <span className="flex items-start gap-1.5">
+                      <MapPin className="mt-0.5 h-3.5 w-3.5 min-w-3.5 shrink-0"/>
+                      <span>{m.location}</span>
+                    </span>
                   </td>
                   <td className="py-3 px-2">
                     <Badge variant={m.merchant_type === 'loket' ? 'VIP' : 'Family'}>
@@ -288,7 +322,7 @@ export default function AdminMerchantsPage() {
       </div>
 
       {/* Modal 1: Create Merchant Form */}
-      <Modal isOpen={isCreateModalOpen} onClose={() => {
+      <Modal deferContent isOpen={isCreateModalOpen} onClose={() => {
             setIsCreateModalOpen(false);
             setEditMerchantData(null);
             reset();
@@ -419,7 +453,7 @@ export default function AdminMerchantsPage() {
             <div className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-wider text-slate-400">Lokasi Pos Kios</span>
               <span className="text-slate-800 flex items-center gap-1 mt-0.5 font-black text-[#1e293b]">
-                <MapPin className="h-3.5 w-3.5 text-slate-400"/> {selectedMerchantDetail.location}
+                <MapPin className="h-3.5 w-3.5 min-w-3.5 shrink-0 text-slate-400"/> {selectedMerchantDetail.location}
               </span>
             </div>
 

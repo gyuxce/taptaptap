@@ -2,16 +2,15 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { Shield, Bell, Menu } from 'lucide-react';
+import { Bell, Menu } from 'lucide-react';
 import { checkMerchantActivity, SilentMerchant } from '@/lib/services/alertService';
 import { formatPhoneForWA } from '@/lib/utils';
 
 interface NavbarProps {
   onMenuClick: () => void;
-  userEmail?: string | null;
 }
 
-export const AdminNavbar: React.FC<NavbarProps> = ({ onMenuClick, userEmail }) => {
+export const AdminNavbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [alerts, setAlerts] = useState<SilentMerchant[]>([]);
@@ -55,8 +54,8 @@ export const AdminNavbar: React.FC<NavbarProps> = ({ onMenuClick, userEmail }) =
   }, []);
 
   return (
-    <header className="h-16 border-b border-[#e5e3db] bg-white flex items-center justify-between px-6 md:px-8 sticky top-0 z-20 shrink-0">
-      <div className="flex items-center gap-3">
+    <header className="h-16 border-b border-[#e5e3db] bg-white flex items-center justify-between px-4 md:px-8 sticky top-0 z-20 shrink-0">
+      <div className="flex items-center gap-2">
         {/* Mobile Hamburger menu */}
         <button
           onClick={onMenuClick}
@@ -82,14 +81,14 @@ export const AdminNavbar: React.FC<NavbarProps> = ({ onMenuClick, userEmail }) =
             onClick={() => setIsOpen(!isOpen)}
             className="p-2 rounded-xl text-[#64748b] hover:text-[#1e293b] hover:bg-[#f7f7f5] transition-colors relative cursor-pointer"
           >
-            <Bell className="h-4.5 w-4.5" />
+            <Bell className="h-5 w-5" />
             {alerts.length > 0 && (
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
             )}
           </button>
 
           {isOpen && (
-            <div className="absolute right-0 mt-2 w-80 bg-white border border-[#e5e3db] rounded-2xl shadow-xl z-30 p-4 text-left flex flex-col gap-2.5">
+            <div className="fixed left-3 right-3 top-[4.5rem] z-50 flex max-h-[calc(100vh-6rem)] flex-col gap-2.5 rounded-2xl border border-[#e5e3db] bg-white p-4 text-left shadow-xl md:absolute md:left-auto md:right-0 md:top-auto md:mt-2 md:w-80">
               <div className="flex items-center justify-between pb-2 border-b border-[#f7f7f5]">
                 <span className="text-xs font-black text-[#1e293b] uppercase tracking-wider">
                   Notifikasi Sistem ({alerts.length})
@@ -101,7 +100,7 @@ export const AdminNavbar: React.FC<NavbarProps> = ({ onMenuClick, userEmail }) =
                 )}
               </div>
 
-              <div className="max-h-60 overflow-y-auto flex flex-col gap-2.5 pr-0.5">
+              <div className="min-h-0 flex-1 overflow-y-auto flex flex-col gap-2.5 pr-0.5">
                 {alerts.length === 0 ? (
                   <div className="py-6 flex flex-col items-center justify-center gap-1.5 text-[#64748b] text-center">
                     <Bell className="h-6 w-6 text-[#cbd5e1]" />
@@ -134,21 +133,6 @@ export const AdminNavbar: React.FC<NavbarProps> = ({ onMenuClick, userEmail }) =
               </div>
             </div>
           )}
-        </div>
-
-        <div className="h-6 w-[1px] bg-[#e5e3db]" />
-
-        {/* User profile details */}
-        <div className="flex items-center gap-2 bg-[#f7f7f5] border border-[#e5e3db] px-3 py-1.5 rounded-xl">
-          <div className="w-5.5 h-5.5 rounded-full bg-[#29ABE2]/10 flex items-center justify-center text-[#29ABE2]">
-            <Shield className="h-3.5 w-3.5" />
-          </div>
-          <div className="text-left hidden xs:block">
-            <p className="text-[10px] font-bold text-[#1e293b] leading-tight">Administrator</p>
-            <p className="text-[9px] text-[#64748b] font-semibold truncate max-w-[100px] mt-0.5">
-              {userEmail || 'admin@wavr.com'}
-            </p>
-          </div>
         </div>
       </div>
     </header>

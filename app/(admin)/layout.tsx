@@ -68,7 +68,7 @@ export default function AdminLayout({
 
       {/* Main content frame */}
       <div className="flex-1 flex flex-col min-h-screen min-w-0">
-        <AdminNavbar userEmail={user.email} onMenuClick={() => setIsMobileSidebarOpen(true)} />
+        <AdminNavbar onMenuClick={() => setIsMobileSidebarOpen(true)} />
         <main className="flex-grow p-4 md:p-8 overflow-y-auto">
           {children}
         </main>
