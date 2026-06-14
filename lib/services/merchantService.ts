@@ -63,3 +63,11 @@ export async function toggleMerchantStatus(id: string): Promise<{
         return { success: false, error: 'Terjadi kesalahan sistem' };
     }
 }
+
+export async function updateMerchantLoyalty(
+    id: string,
+    config: { loyalty_enabled: boolean; loyalty_target: number; loyalty_reward: string }
+) {
+    const { error } = await supabase.from('merchants').update(config).eq('id', id);
+    return { success: !error, error: error?.message };
+}

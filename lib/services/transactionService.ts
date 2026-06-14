@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Transaction } from '@/types';
+import { LoyaltyInfo, Transaction } from '@/types';
 export interface LogTransactionInput {
     rfid_uid: string;
     merchant_id: string;
@@ -29,6 +29,9 @@ interface TransactionQueryRow {
     refunded_at?: string | null;
     refund_reason?: string | null;
     refunded_by?: string | null;
+    source?: Transaction['source'];
+    order_id?: string | null;
+    note?: string | null;
     merchant?: {
         name?: string;
         category?: string;
@@ -48,9 +51,11 @@ interface TransactionStatRow {
     amount: number | string;
     type: Transaction['type'];
     created_at: string;
+    refunded_at?: string | null;
 }
 export async function logTransaction(data: LogTransactionInput): Promise<{
     transaction: Transaction;
+    loyalty?: LoyaltyInfo | null;
 } | {
     error: string;
 }> {
@@ -105,7 +110,8 @@ export async function logTransaction(data: LogTransactionInput): Promise<{
                 })
             }).catch(err => console.warn('[transactionService] WA failed:', err));
         }
-        return { transaction: inserted };
+        const loyalty = (result.loyalty || null) as LoyaltyInfo | null;
+        return { transaction: inserted, loyalty };
     }
     catch (err: unknown) {
         console.error('[transactionService] logTransaction caught error:', err);
@@ -179,6 +185,9 @@ export async function fetchTransactions(merchantId: string, filters: Transaction
                 refunded_at: tx.refunded_at,
                 refund_reason: tx.refund_reason,
                 refunded_by: tx.refunded_by,
+                source: tx.source || 'tap',
+                order_id: tx.order_id,
+                note: tx.note,
                 visitor_name: vInfo?.name || 'Unknown',
                 visitor_phone: vInfo?.phone || undefined,
                 ticket_type: vInfo?.ticket_type || 'Regular',
@@ -219,7 +228,7 @@ export async function fetchTransactionStats(merchantId: string): Promise<{
         const startOfWeekISO = startOfWeek.toISOString();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
         // Fetch stats from Supabase
-        let query = supabase.from('transactions').select('amount, type, created_at');
+        let query = supabase.from('transactions').select('amount, type, created_at, refunded_at');
         if (merchantId !== 'all') {
             query = query.eq('merchant_id', merchantId);
         }
@@ -235,7 +244,7 @@ export async function fetchTransactionStats(merchantId: string): Promise<{
         const todayList = rows.filter(t => t.created_at >= startOfToday);
         const weekList = rows.filter(t => t.created_at >= startOfWeekISO);
         const sumTotal = (list: TransactionStatRow[]) => list
-            .filter(t => t.type === 'payment')
+            .filter(t => t.type === 'payment' && !t.refunded_at)
             .reduce((acc, t) => acc + Number(t.amount), 0);
         const count = (list: TransactionStatRow[]) => list.length;
         return {

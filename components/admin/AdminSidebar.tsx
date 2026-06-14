@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from '@/lib/auth';
-import { LayoutDashboard, Users, Store, History, LogOut, FileBarChart } from 'lucide-react';
+import { LayoutDashboard, Users, Store, History, LogOut, FileBarChart, UtensilsCrossed } from 'lucide-react';
 import { WavrLogo } from '@/components/ui/WavrLogo';
 
 interface SidebarProps {
@@ -27,6 +27,7 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ className, onCloseMobile,
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Wisatawan', href: '/visitors', icon: Users },
     { name: 'Merchant', href: '/merchants', icon: Store },
+    { name: 'Menu & Produk', href: '/menu-products', icon: UtensilsCrossed },
     { name: 'Transaksi', href: '/transactions', icon: History },
     { name: 'Laporan', href: '/reports', icon: FileBarChart },
   ];

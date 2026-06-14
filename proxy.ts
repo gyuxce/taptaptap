@@ -25,9 +25,11 @@ export const config = {
   matcher: [
     '/',
     '/tap/:path*',
+    '/pos/:path*',
     '/dashboard/:path*',
     '/visitors/:path*',
     '/merchants/:path*',
+    '/menu-products/:path*',
     '/transactions/:path*',
     '/reports/:path*',
   ],

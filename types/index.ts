@@ -35,6 +35,9 @@ export interface Merchant {
   owner_user_id: string | null
   phone?: string | null
   is_active: boolean
+  loyalty_enabled?: boolean
+  loyalty_target?: number
+  loyalty_reward?: string
   created_at: string
 }
 
@@ -49,12 +52,51 @@ export interface Transaction {
   refunded_at?: string | null
   refund_reason?: string | null
   refunded_by?: string | null
+  source?: 'tap' | 'pos' | 'reward'
+  order_id?: string | null
+  note?: string | null
   // joined fields (tidak di DB, di-compute saat fetch)
   visitor_name?: string
   visitor_phone?: string
   ticket_type?: string
   merchant_name?: string
   merchant_category?: string
+}
+
+export interface MenuItem {
+  id: string
+  merchant_id: string
+  name: string
+  price: number
+  category: string
+  is_available: boolean
+  sort_order: number
+  created_at: string
+  updated_at?: string
+}
+
+export interface PosOrder {
+  id: string
+  merchant_id: string
+  rfid_uid: string
+  visitor_id: string
+  visitor_name: string
+  status: 'open' | 'paid' | 'cancelled' | 'refunded'
+  total_amount: number
+  note?: string | null
+  transaction_id?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface LoyaltyInfo {
+  enabled: boolean
+  target: number
+  reward: string
+  stamp_count: number
+  cycle_progress: number
+  available_rewards: number
+  remaining: number
 }
 
 export interface CreditCheckResult {

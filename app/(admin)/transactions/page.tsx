@@ -346,11 +346,11 @@ export default function AdminTransactionsPage() {
                     <td className="py-3 px-2 text-[#64748b] font-semibold">{tx.merchant_name}</td>
                     <td className="py-3 px-2">
                       <Badge variant={tx.type === 'entry' ? 'VIP' : 'Regular'}>
-                        {tx.type === 'entry' ? 'Entry' : 'Belanja'}
+                        {tx.type === 'entry' ? 'Entry' : tx.source === 'reward' ? 'Reward' : tx.source === 'pos' ? 'POS' : 'Belanja'}
                       </Badge>
                     </td>
                     <td className={`py-3 px-2 text-right font-black ${tx.type === 'entry' ? 'text-gray-400' : 'text-red-600'}`}>
-                      {tx.type === 'entry' ? 'Entry' : tx.refunded_at ? `Refund ${formatRupiah(tx.amount)}` : `-${formatRupiah(tx.amount)}`}
+                      {tx.type === 'entry' ? 'Entry' : tx.source === 'reward' ? 'GRATIS' : tx.refunded_at ? `Refund ${formatRupiah(tx.amount)}` : `-${formatRupiah(tx.amount)}`}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <Badge variant={
@@ -385,7 +385,7 @@ export default function AdminTransactionsPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      {tx.type === 'payment' && !tx.refunded_at ? (
+                      {tx.type === 'payment' && tx.amount > 0 && !tx.refunded_at ? (
                         <Button variant="ghost" size="sm" onClick={() => {
                           setRefundTarget(tx);
                           setRefundReason('');

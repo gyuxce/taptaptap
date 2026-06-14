@@ -46,6 +46,14 @@ localStorage.
 
 ## Database
 
+### POS dan Loyalty
+
+Untuk mengaktifkan modul POS restaurant dan loyalty, jalankan sekali file berikut melalui Supabase SQL Editor:
+
+`migrations/20260614_add_pos_loyalty.sql`
+
+Migrasi ini menambahkan menu, order, detail order, ledger loyalty, pembayaran POS atomik, resume draft order, dan sinkronisasi refund.
+
 1. Jalankan [schema.sql](./schema.sql) melalui Supabase SQL Editor.
 2. Buat user administrator melalui Supabase Auth.
 3. Tambahkan profil administrator:

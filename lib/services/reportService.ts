@@ -52,6 +52,7 @@ interface RevenueTransactionRow {
     merchant?: { name?: string } | null;
     merchant_name?: string;
     refunded_at?: string | null;
+    source?: Transaction['source'];
 }
 
 interface RevenueTagRow {
@@ -150,7 +151,7 @@ export async function getRevenueReport(filters: RevenueReportFilters): Promise<R
         }
         // Aggregate by merchant
         const report: RevenueReportItem[] = merchantsList.map(m => {
-            const merchantTxs = allTransactions.filter(t => t.merchant_id === m.id);
+            const merchantTxs = allTransactions.filter(t => t.merchant_id === m.id && t.source !== 'reward');
             const total_taps = merchantTxs.length;
             const total_revenue = merchantTxs
                 .filter(t => t.type === 'payment' && !t.refunded_at)
@@ -273,7 +274,7 @@ export async function generateMerchantCommissionReport(merchantId: string, dateF
         // Group by day for breakdown
         const breakdown: CommissionReportBreakdown[] = dateList.map(dateStr => {
             const dayTxs = merchantTxs.filter(t => toLocalDateKey(t.created_at) === dateStr);
-            const total_taps = dayTxs.length;
+            const total_taps = dayTxs.filter(t => t.source !== 'reward').length;
             const total_revenue = dayTxs
                 .filter(t => t.type === 'payment' && !t.refunded_at)
                 .reduce((sum, t) => sum + Number(t.amount), 0);
@@ -287,7 +288,7 @@ export async function generateMerchantCommissionReport(merchantId: string, dateF
                 net_payout
             };
         });
-        const total_taps = merchantTxs.length;
+        const total_taps = merchantTxs.filter(t => t.source !== 'reward').length;
         const total_revenue = merchantTxs
             .filter(t => t.type === 'payment' && !t.refunded_at)
             .reduce((sum, t) => sum + Number(t.amount), 0);

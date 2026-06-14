@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { db } from '@/lib/supabase';
 import { Merchant } from '@/types';
 import { createMerchantSchema, CreateMerchantInput } from '@/lib/validations';
-import { toggleMerchantStatus } from '@/lib/services/merchantService';
+import { toggleMerchantStatus, updateMerchantLoyalty } from '@/lib/services/merchantService';
 import { formatPhoneForWA, formatDatetime } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Toaster, toast } from '@/components/ui/Toast';
-import { Plus, Store, MapPin, ShieldAlert, Key, Phone, Calendar, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Store, MapPin, ShieldAlert, Key, Phone, Calendar, Pencil, Trash2, Gift } from 'lucide-react';
 export default function AdminMerchantsPage() {
     const [merchants, setMerchants] = useState<Merchant[]>([]);
     const [loading, setLoading] = useState(true);
@@ -37,6 +37,11 @@ export default function AdminMerchantsPage() {
     } | null>(null);
     // Detail modal state
     const [selectedMerchantDetail, setSelectedMerchantDetail] = useState<Merchant | null>(null);
+    const [loyaltyMerchant, setLoyaltyMerchant] = useState<Merchant | null>(null);
+    const [loyaltyTarget, setLoyaltyTarget] = useState(10);
+    const [loyaltyReward, setLoyaltyReward] = useState('1x Gratis');
+    const [loyaltyEnabled, setLoyaltyEnabled] = useState(false);
+    const [loyaltySaving, setLoyaltySaving] = useState(false);
     const [provisioningMerchant, setProvisioningMerchant] = useState<string | null>(null);
     // Form setup for create merchant
     const { register, handleSubmit, setValue, reset, formState: { errors, isSubmitting }, } = useForm<CreateMerchantInput>({
@@ -124,6 +129,33 @@ export default function AdminMerchantsPage() {
     };
     const handleDeleteClick = (m: Merchant) => {
         setConfirmDeleteData(m);
+    };
+    const openLoyaltyConfig = (m: Merchant) => {
+        setLoyaltyMerchant(m);
+        setLoyaltyEnabled(Boolean(m.loyalty_enabled));
+        setLoyaltyTarget(m.loyalty_target || 10);
+        setLoyaltyReward(m.loyalty_reward || '1x Gratis');
+    };
+    const saveLoyaltyConfig = async () => {
+        if (!loyaltyMerchant || loyaltyTarget < 2 || !loyaltyReward.trim())
+            return toast.error('Konfigurasi loyalty belum valid');
+        setLoyaltySaving(true);
+        const result = await updateMerchantLoyalty(loyaltyMerchant.id, {
+            loyalty_enabled: loyaltyEnabled,
+            loyalty_target: loyaltyTarget,
+            loyalty_reward: loyaltyReward.trim(),
+        });
+        setLoyaltySaving(false);
+        if (!result.success)
+            return toast.error('Gagal menyimpan loyalty. Jalankan migrasi POS terlebih dahulu.');
+        setMerchants(current => current.map(item => item.id === loyaltyMerchant.id ? {
+            ...item,
+            loyalty_enabled: loyaltyEnabled,
+            loyalty_target: loyaltyTarget,
+            loyalty_reward: loyaltyReward.trim(),
+        } : item));
+        setLoyaltyMerchant(null);
+        toast.success('Konfigurasi loyalty diperbarui');
     };
     const handleConfirmDelete = async () => {
         if (!confirmDeleteData)
@@ -304,6 +336,9 @@ export default function AdminMerchantsPage() {
                     </Button>
                     <Button onClick={() => handleEditClick(m)} variant="ghost" size="sm" className="text-blue-600 hover:bg-blue-50 border border-blue-200 font-bold px-2 py-1 rounded-lg flex items-center gap-1">
                       <Pencil className="h-3 w-3"/> Edit
+                    </Button>
+                    <Button onClick={() => openLoyaltyConfig(m)} variant="ghost" size="sm" className="text-amber-600 hover:bg-amber-50 border border-amber-200 font-bold px-2 py-1 rounded-lg flex items-center gap-1">
+                      <Gift className="h-3 w-3"/> Loyalty
                     </Button>
                     <Button onClick={() => handleDeleteClick(m)} variant="ghost" size="sm" className="text-red-600 hover:bg-red-50 border border-red-200 font-bold px-2 py-1 rounded-lg flex items-center gap-1">
                       <Trash2 className="h-3 w-3"/> Hapus
@@ -500,6 +535,20 @@ export default function AdminMerchantsPage() {
               </Button>
             </div>
           </div>)}
+      </Modal>
+
+      <Modal isOpen={loyaltyMerchant !== null} onClose={() => setLoyaltyMerchant(null)} title="Konfigurasi Loyalty">
+        <div className="space-y-4">
+          <div className="rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800">{loyaltyMerchant?.name}</div>
+          <label className="flex min-h-11 items-center gap-3 rounded-xl border p-3 text-sm font-bold">
+            <input type="checkbox" checked={loyaltyEnabled} onChange={(event) => setLoyaltyEnabled(event.target.checked)}/>
+            Aktifkan loyalty
+          </label>
+          <Input label="Target kunjungan" type="number" min={2} max={50} value={loyaltyTarget} onChange={(event) => setLoyaltyTarget(Number(event.target.value))}/>
+          <Input label="Nama reward" value={loyaltyReward} onChange={(event) => setLoyaltyReward(event.target.value)} placeholder="Contoh: 1x Makan Gratis"/>
+          <p className="text-[10px] text-slate-500">Satu stamp diberikan maksimal sekali per wisatawan, merchant, dan hari setelah pembayaran berhasil.</p>
+          <Button onClick={saveLoyaltyConfig} loading={loyaltySaving} fullWidth>Simpan Loyalty</Button>
+        </div>
       </Modal>
 
       {/* Toggle status confirmation dialog */}

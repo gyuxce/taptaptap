@@ -30,6 +30,10 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StatCard } from '@/components/ui/StatCard';
 import { Modal } from '@/components/ui/Modal';
 import { useMerchantHistory } from '@/components/merchant/useMerchantHistory';
+import { LoyaltyCard } from '@/components/merchant/LoyaltyCard';
+import { MerchantNav } from '@/components/merchant/MerchantNav';
+import { fetchLoyaltyInfo, redeemLoyaltyReward } from '@/lib/services/loyaltyService';
+import type { LoyaltyInfo } from '@/types';
 
 const RevenueChart = dynamic(() => import('@/components/merchant/RevenueChart'), {
   ssr: false,
@@ -77,6 +81,9 @@ export default function MerchantTerminalPage() {
   const [showSuccessFlash, setShowSuccessFlash] = useState(false);
   const [successVisitorName, setSuccessVisitorName] = useState('');
   const [successTitle, setSuccessTitle] = useState('Tap Berhasil Dicatat');
+  const [successSubtitle, setSuccessSubtitle] = useState('');
+  const [loyaltyInfo, setLoyaltyInfo] = useState<LoyaltyInfo | null>(null);
+  const [loyaltyLoading, setLoyaltyLoading] = useState(false);
 
   // Credit Error Drawer Details
   const [creditErrorDetails, setCreditErrorDetails] = useState<{
@@ -254,6 +261,14 @@ export default function MerchantTerminalPage() {
         setSelectedTag(res.tag);
         // Default defaultNominal preset
         setPaymentAmount(defaultNominal.toString());
+        if (merchant?.loyalty_enabled) {
+          setLoyaltyLoading(true);
+          void fetchLoyaltyInfo(uid, merchant.id)
+            .then(setLoyaltyInfo)
+            .finally(() => setLoyaltyLoading(false));
+        } else {
+          setLoyaltyInfo(null);
+        }
         setActiveDrawer('visitor');
       }
     } catch {
@@ -261,7 +276,7 @@ export default function MerchantTerminalPage() {
     } finally {
       setTapScenarioLoading(false);
     }
-  }, [defaultNominal]);
+  }, [defaultNominal, merchant]);
 
   const triggerNFCScan = useCallback(async () => {
     if (typeof window === 'undefined') return;
@@ -500,6 +515,14 @@ export default function MerchantTerminalPage() {
         // D. Success Overlay
         setSuccessVisitorName(selectedVisitor?.name || 'Wisatawan');
         setSuccessTitle(merchant.merchant_type === 'loket' ? 'Tap Masuk Berhasil' : 'Pembayaran Berhasil');
+        if (logRes.loyalty?.enabled) {
+          setLoyaltyInfo(logRes.loyalty);
+          setSuccessSubtitle(logRes.loyalty.available_rewards > 0
+            ? 'Reward siap digunakan!'
+            : `${logRes.loyalty.remaining} kunjungan lagi untuk ${logRes.loyalty.reward}`);
+        } else {
+          setSuccessSubtitle('');
+        }
         setActiveDrawer(null);
         setShowSuccessFlash(true);
 
@@ -554,6 +577,7 @@ export default function MerchantTerminalPage() {
       } else {
         setSuccessVisitorName(res.visitor.name);
         setSuccessTitle('Pendaftaran Berhasil');
+        setSuccessSubtitle('');
         setNewTagUID('');
         resetRegForm();
 
@@ -690,6 +714,24 @@ export default function MerchantTerminalPage() {
     .slice(0, 8)
     .toUpperCase()}`;
 
+  const handleRedeemReward = async () => {
+    if (!merchant || !scannedUID) return;
+    setConfirmTapLoading(true);
+    try {
+      const result = await redeemLoyaltyReward(scannedUID, merchant.id);
+      setSuccessTitle('Reward Digunakan!');
+      setSuccessVisitorName(selectedVisitor?.name || 'Wisatawan');
+      setSuccessSubtitle(result.reward);
+      setActiveDrawer(null);
+      setShowSuccessFlash(true);
+      setLoyaltyInfo(await fetchLoyaltyInfo(scannedUID, merchant.id));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Reward gagal digunakan');
+    } finally {
+      setConfirmTapLoading(false);
+    }
+  };
+
   const closeVisitorDrawer = () => {
     setActiveDrawer(null);
     setSelectedVisitor(null);
@@ -724,21 +766,22 @@ export default function MerchantTerminalPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#E8F6FD] z-50 flex flex-col items-center justify-center gap-4 text-center p-6"
+              className={`absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 text-center p-6 ${successTitle === 'Reward Digunakan!' ? 'bg-amber-50' : 'bg-[#E8F6FD]'}`}
             >
               <motion.div
                 initial={{ scale: 0.3, rotate: -45 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: 'spring', damping: 12 }}
-                className="w-24 h-24 rounded-full bg-[#29ABE2] flex items-center justify-center text-white shadow-lg"
+                className={`w-24 h-24 rounded-full flex items-center justify-center text-white shadow-lg ${successTitle === 'Reward Digunakan!' ? 'bg-amber-500' : 'bg-[#29ABE2]'}`}
               >
                 <CheckCircle2 className="h-12 w-12" />
               </motion.div>
               <div className="space-y-1">
-                <h3 className="text-lg font-black text-[#29ABE2] uppercase tracking-wide">
+                <h3 className={`text-lg font-black uppercase tracking-wide ${successTitle === 'Reward Digunakan!' ? 'text-amber-700' : 'text-[#29ABE2]'}`}>
                   {successTitle}
                 </h3>
                 <p className="text-sm font-bold text-[#1e293b]">{successVisitorName}</p>
+                {successSubtitle && <p className="text-xs font-semibold text-[#64748b]">{successSubtitle}</p>}
               </div>
               <Button
                 variant="ghost"
@@ -923,7 +966,7 @@ export default function MerchantTerminalPage() {
                     {tx.visitor_name || 'Wisatawan'}
                   </span>
                   <span className="font-semibold text-gray-400 font-mono text-[9px] shrink-0 ml-2">
-                    {tx.type === 'entry' ? 'Masuk' : formatRupiah(tx.amount)} | {new Date(tx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                    {tx.type === 'entry' ? 'Masuk' : tx.source === 'reward' ? 'Reward' : tx.source === 'pos' ? `POS ${formatRupiah(tx.amount)}` : formatRupiah(tx.amount)} | {new Date(tx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
               ))}
@@ -934,6 +977,8 @@ export default function MerchantTerminalPage() {
           </div>
 
         </div>
+
+        <MerchantNav active="tap" onHistory={() => setActiveDrawer('history')} />
 
         {/* ===================================================================
             MODALS & DRAWERS (SLIDE-UP SHEETS)
@@ -1025,6 +1070,14 @@ export default function MerchantTerminalPage() {
                   <span className="font-bold text-[#1e293b]">{new Date(selectedTag.registered_at).toLocaleDateString()}</span>
                 </div>
               </div>
+
+              {!isEntryGate && (
+                <LoyaltyCard
+                  info={loyaltyInfo}
+                  loading={loyaltyLoading}
+                  onRedeem={loyaltyInfo?.available_rewards ? handleRedeemReward : undefined}
+                />
+              )}
 
               {/* Credit details progress bar */}
               {selectedVisitor.credit_limit > 0 && (
@@ -1793,7 +1846,7 @@ export default function MerchantTerminalPage() {
 
                       <div className="text-right shrink-0">
                         <span className={`font-black ${tx.type === 'entry' ? 'text-[#29ABE2]' : 'text-red-600'}`}>
-                          {tx.type === 'entry' ? 'Entry' : `-${formatRupiah(tx.amount)}`}
+                          {tx.type === 'entry' ? 'Entry' : tx.source === 'reward' ? 'GRATIS' : tx.source === 'pos' ? `POS ${formatRupiah(tx.amount)}` : `-${formatRupiah(tx.amount)}`}
                         </span>
                         <span className="text-[9px] font-bold text-green-600 block mt-0.5 bg-green-50 px-1 rounded-full border border-green-100 text-center">
                           Synced

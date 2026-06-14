@@ -34,7 +34,7 @@ describe('route authorization', () => {
   });
 
   it('allows only admin profiles into admin routes', () => {
-    for (const path of ['/dashboard', '/visitors', '/merchants', '/transactions', '/reports']) {
+    for (const path of ['/dashboard', '/visitors', '/merchants', '/menu-products', '/transactions', '/reports']) {
       expect(canAccessPath(admin, path)).toBe(true);
       expect(canAccessPath(loket, path)).toBe(false);
       expect(canAccessPath(regular, path)).toBe(false);
@@ -47,5 +47,8 @@ describe('route authorization', () => {
     expect(canAccessPath(regular, '/tap')).toBe(true);
     expect(canAccessPath(admin, '/tap')).toBe(false);
     expect(canAccessPath(null, '/tap')).toBe(false);
+    expect(canAccessPath(loket, '/pos')).toBe(true);
+    expect(canAccessPath(regular, '/pos')).toBe(true);
+    expect(canAccessPath(admin, '/pos')).toBe(false);
   });
 });
