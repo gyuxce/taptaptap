@@ -40,8 +40,16 @@ export default function MerchantPosPage() {
     if (authLoading) return;
     if (!user || !profile) return router.push('/');
     if (profile.role === 'admin') return router.push('/dashboard');
+    if (profile.merchant_type !== 'regular') return router.replace('/tap');
     void getMerchantByUserId(profile.id).then(setMerchant);
   }, [authLoading, profile, router, user]);
+
+  useEffect(() => {
+    if (!merchant || !profile) return;
+    if (merchant.merchant_type !== 'regular' || profile.merchant_id !== merchant.id) {
+      router.replace('/tap');
+    }
+  }, [merchant, profile, router]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
   useEffect(() => {
@@ -273,7 +281,7 @@ export default function MerchantPosPage() {
           </main>
         )}
 
-        <MerchantNav active="pos" onHistory={() => router.push('/tap')} />
+        <MerchantNav active="pos" merchantType="regular" onHistory={() => router.push('/tap')} />
 
         <Modal isOpen={cartOpen} onClose={() => setCartOpen(false)} title="Detail Order" footer={
           <Button onClick={checkout} loading={checkoutLoading} disabled={cart.length === 0} fullWidth>

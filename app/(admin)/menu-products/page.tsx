@@ -27,8 +27,9 @@ export default function MenuProductsPage() {
 
   useEffect(() => {
     void db.getMerchants().then(list => {
-      setMerchants(list);
-      if (list[0]) setMerchantId(list[0].id);
+      const regularMerchants = list.filter(item => item.merchant_type === 'regular');
+      setMerchants(regularMerchants);
+      if (regularMerchants[0]) setMerchantId(regularMerchants[0].id);
     });
   }, []);
 
@@ -102,7 +103,11 @@ export default function MenuProductsPage() {
     <div className="space-y-6">
       <Toaster position="top-center" richColors />
       <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-        <div><p className="text-xs font-bold uppercase text-[#29ABE2]">POS Restaurant</p><h1 className="text-2xl font-black">Menu & Produk</h1></div>
+        <div>
+          <p className="text-xs font-bold uppercase text-[#29ABE2]">POS Merchant Reguler</p>
+          <h1 className="text-2xl font-black">Menu & Produk</h1>
+          <p className="mt-1 text-xs text-slate-500">Loket tidak memakai menu atau transaksi POS.</p>
+        </div>
         <Button onClick={startCreate} disabled={!merchantId}><Plus className="mr-2 h-4 w-4" /> Tambah Menu</Button>
       </header>
       <div className="rounded-2xl border bg-white p-4">

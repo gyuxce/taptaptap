@@ -9,7 +9,10 @@ export function getRole(profile: Profile | null): AppRole {
 export function canAccessPath(profile: Profile | null, pathname: string) {
   const role = getRole(profile);
   if (pathname === '/') return true;
-  if (pathname.startsWith('/tap') || pathname.startsWith('/pos')) return role === 'merchant';
+  if (pathname.startsWith('/tap')) return role === 'merchant';
+  if (pathname.startsWith('/pos')) {
+    return role === 'merchant' && profile?.merchant_type === 'regular';
+  }
 
   const adminPrefixes = ['/dashboard', '/visitors', '/merchants', '/menu-products', '/transactions', '/reports'];
   if (adminPrefixes.some(prefix => pathname.startsWith(prefix))) {

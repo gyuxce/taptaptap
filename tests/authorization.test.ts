@@ -42,12 +42,12 @@ describe('route authorization', () => {
     }
   });
 
-  it('allows merchant profiles, but not admin or anonymous users, into terminal routes', () => {
+  it('separates loket entry access from regular merchant POS access', () => {
     expect(canAccessPath(loket, '/tap')).toBe(true);
     expect(canAccessPath(regular, '/tap')).toBe(true);
     expect(canAccessPath(admin, '/tap')).toBe(false);
     expect(canAccessPath(null, '/tap')).toBe(false);
-    expect(canAccessPath(loket, '/pos')).toBe(true);
+    expect(canAccessPath(loket, '/pos')).toBe(false);
     expect(canAccessPath(regular, '/pos')).toBe(true);
     expect(canAccessPath(admin, '/pos')).toBe(false);
   });

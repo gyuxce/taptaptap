@@ -978,7 +978,11 @@ export default function MerchantTerminalPage() {
 
         </div>
 
-        <MerchantNav active="tap" onHistory={() => setActiveDrawer('history')} />
+        <MerchantNav
+          active="tap"
+          merchantType={merchant.merchant_type}
+          onHistory={() => setActiveDrawer('history')}
+        />
 
         {/* ===================================================================
             MODALS & DRAWERS (SLIDE-UP SHEETS)

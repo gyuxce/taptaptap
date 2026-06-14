@@ -106,6 +106,9 @@ export async function checkoutPosOrder(input: {
     const message = error?.message || '';
     if (message.includes('INSUFFICIENT_CREDIT')) throw new Error('Saldo wisatawan tidak mencukupi');
     if (message.includes('MENU_ITEM_UNAVAILABLE')) throw new Error('Ada menu yang sudah tidak tersedia');
+    if (message.includes('POS_REGULAR_MERCHANT_ONLY')) {
+      throw new Error('POS hanya tersedia untuk akun merchant reguler');
+    }
     throw formatPosError(error, 'Order gagal diproses');
   }
   return data;
