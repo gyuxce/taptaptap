@@ -75,31 +75,40 @@ ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.loyalty_events ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "menu read" ON public.menu_items;
 CREATE POLICY "menu read" ON public.menu_items FOR SELECT TO authenticated USING (TRUE);
+DROP POLICY IF EXISTS "menu manage" ON public.menu_items;
 CREATE POLICY "menu manage" ON public.menu_items FOR ALL TO authenticated
   USING (current_app_role() = 'admin' OR merchant_id = current_merchant_id())
   WITH CHECK (current_app_role() = 'admin' OR merchant_id = current_merchant_id());
+DROP POLICY IF EXISTS "orders read" ON public.orders;
 CREATE POLICY "orders read" ON public.orders FOR SELECT TO authenticated
   USING (current_app_role() = 'admin' OR merchant_id = current_merchant_id());
+DROP POLICY IF EXISTS "orders create" ON public.orders;
 CREATE POLICY "orders create" ON public.orders FOR INSERT TO authenticated
   WITH CHECK (current_app_role() = 'admin' OR merchant_id = current_merchant_id());
+DROP POLICY IF EXISTS "orders update" ON public.orders;
 CREATE POLICY "orders update" ON public.orders FOR UPDATE TO authenticated
   USING (current_app_role() = 'admin' OR merchant_id = current_merchant_id());
+DROP POLICY IF EXISTS "items read" ON public.order_items;
 CREATE POLICY "items read" ON public.order_items FOR SELECT TO authenticated
   USING (EXISTS (
     SELECT 1 FROM public.orders o WHERE o.id = order_id
       AND (current_app_role() = 'admin' OR o.merchant_id = current_merchant_id())
   ));
+DROP POLICY IF EXISTS "items create" ON public.order_items;
 CREATE POLICY "items create" ON public.order_items FOR INSERT TO authenticated
   WITH CHECK (EXISTS (
     SELECT 1 FROM public.orders o WHERE o.id = order_id AND o.status = 'open'
       AND (current_app_role() = 'admin' OR o.merchant_id = current_merchant_id())
   ));
+DROP POLICY IF EXISTS "items delete" ON public.order_items;
 CREATE POLICY "items delete" ON public.order_items FOR DELETE TO authenticated
   USING (EXISTS (
     SELECT 1 FROM public.orders o WHERE o.id = order_id AND o.status = 'open'
       AND (current_app_role() = 'admin' OR o.merchant_id = current_merchant_id())
   ));
+DROP POLICY IF EXISTS "loyalty read" ON public.loyalty_events;
 CREATE POLICY "loyalty read" ON public.loyalty_events FOR SELECT TO authenticated
   USING (current_app_role() = 'admin' OR merchant_id = current_merchant_id());
 
@@ -250,7 +259,9 @@ DECLARE
   item JSONB; menu menu_items%ROWTYPE; qty INTEGER; total NUMERIC:=0; wa TEXT;
 BEGIN
   SELECT * INTO p FROM profiles WHERE id=auth.uid();
-  IF p.role<>'admin' AND p.merchant_id<>p_merchant_id THEN RAISE EXCEPTION 'FORBIDDEN'; END IF;
+  IF p.id IS NULL OR (p.role<>'admin' AND p.merchant_id<>p_merchant_id) THEN
+    RAISE EXCEPTION 'FORBIDDEN';
+  END IF;
   SELECT * INTO m FROM merchants WHERE id=p_merchant_id AND is_active=TRUE;
   IF m.id IS NULL THEN RAISE EXCEPTION 'MERCHANT_INACTIVE'; END IF;
   SELECT * INTO existing FROM transactions WHERE idempotency_key=p_idempotency_key;

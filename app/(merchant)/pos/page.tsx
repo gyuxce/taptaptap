@@ -30,6 +30,7 @@ export default function MerchantPosPage() {
   const [resumed, setResumed] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [loyalty, setLoyalty] = useState<LoyaltyInfo | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -69,6 +70,7 @@ export default function MerchantPosPage() {
   const processUid = useCallback(async (uid: string) => {
     if (!merchant) return;
     setScanning(false);
+    setProcessing(true);
     try {
       const result = await fetchVisitorByUID(uid);
       if ('error' in result) throw new Error('Gelang belum terdaftar atau tidak aktif');
@@ -89,13 +91,27 @@ export default function MerchantPosPage() {
       idempotencyRef.current = crypto.randomUUID();
       setState('ordering');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Gagal membuka POS');
+      toast.error('POS belum dapat dibuka', {
+        description: error instanceof Error
+          ? error.message
+          : 'Terjadi kendala saat membuka POS',
+      });
+    } finally {
+      setProcessing(false);
     }
   }, [merchant]);
 
   const scanNfc = async () => {
+    if (scanning) {
+      abortRef.current?.abort();
+      setScanning(false);
+      return;
+    }
+
     if (!('NDEFReader' in window)) {
-      toast.error('Web NFC hanya tersedia di Chrome Android melalui HTTPS');
+      toast.error('NFC tidak tersedia', {
+        description: 'Gunakan Chrome Android pada perangkat yang mendukung NFC.',
+      });
       return;
     }
     abortRef.current?.abort();
@@ -106,10 +122,16 @@ export default function MerchantPosPage() {
       const reader = new NDEFReader();
       await reader.scan({ signal: controller.signal });
       reader.onreading = event => void processUid(normalizeUID(event.serialNumber));
-      reader.onreadingerror = () => toast.error('Gelang gagal dibaca');
+      reader.onreadingerror = () => toast.error('Gelang gagal dibaca', {
+        description: 'Tempelkan kembali gelang dan tahan sebentar di belakang HP.',
+      });
     } catch (error) {
       setScanning(false);
-      if (!(error instanceof DOMException && error.name === 'AbortError')) toast.error('NFC gagal dimulai');
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        toast.error('NFC gagal dimulai', {
+          description: 'Periksa izin NFC lalu coba lagi.',
+        });
+      }
     }
   };
 
@@ -173,12 +195,35 @@ export default function MerchantPosPage() {
         </header>
 
         {state === 'scan' && (
-          <main className="flex flex-1 flex-col items-center justify-center gap-6 p-6 text-center">
-            <button onClick={scanNfc} disabled={scanning} className="flex h-40 w-40 flex-col items-center justify-center gap-3 rounded-full bg-[#29ABE2] text-white shadow-xl">
-              <SmartphoneNfc className={`h-14 w-14 ${scanning ? 'animate-bounce' : ''}`} />
-              <span className="text-xs font-black">{scanning ? 'MENUNGGU NFC' : 'TAP UNTUK ORDER'}</span>
-            </button>
-            <div><h1 className="font-black">Tap Gelang Tamu</h1><p className="text-xs text-slate-500">Dekatkan gelang ke HP untuk mulai order</p></div>
+          <main className="flex flex-1 flex-col items-center justify-center gap-3 bg-[linear-gradient(180deg,#f1faf6_0%,#ffffff_62%)] p-6 text-center">
+            <div className="relative flex h-64 w-64 items-center justify-center">
+              {(scanning || processing) && (
+                <>
+                  <span className="absolute h-64 w-64 animate-ping rounded-full border border-[#1D9E75]/15 bg-[#1D9E75]/5 [animation-duration:2.2s]" />
+                  <span className="absolute h-52 w-52 animate-pulse rounded-full border border-[#1D9E75]/20 bg-[#1D9E75]/5" />
+                </>
+              )}
+              <button
+                onClick={scanNfc}
+                disabled={processing}
+                className="relative z-10 flex h-40 w-40 flex-col items-center justify-center gap-3 rounded-full bg-[#1D9E75] text-white shadow-[0_20px_44px_rgba(29,158,117,0.3)] transition duration-200 active:scale-95 disabled:cursor-wait disabled:opacity-90"
+              >
+                <SmartphoneNfc className={`h-14 w-14 ${scanning ? 'animate-pulse' : ''}`} />
+                <span className="text-xs font-black">
+                  {processing ? 'MEMBUKA POS' : scanning ? 'PULSE ON' : 'TAP UNTUK ORDER'}
+                </span>
+              </button>
+            </div>
+            <div>
+              <h1 className="font-black">Tap Gelang Tamu</h1>
+              <p className="mt-1 text-xs text-slate-500">
+                {scanning
+                  ? 'NFC aktif, dekatkan gelang ke bagian belakang HP'
+                  : processing
+                    ? 'Menyiapkan data tamu dan menu merchant'
+                    : 'Dekatkan gelang ke HP untuk mulai order'}
+              </p>
+            </div>
           </main>
         )}
 
